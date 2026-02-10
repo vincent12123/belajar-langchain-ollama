@@ -1,0 +1,30 @@
+SOP Perpustakaan mengatur alur layanan, tata tertib, dan pengelolaan koleksi guna memastikan operasional yang konsisten dan berkualitas. Komponen utamanya meliputi prosedur keanggotaan, sirkulasi (peminjaman/pengembalian), layanan referensi, serta perawatan koleksi, yang sering kali didukung teknologi informasi dan tata tertib pengguna demi kenyamanan bersama. 
+Berikut adalah garis besar SOP Perpustakaan yang umum diterapkan:
+1. SOP Layanan Keanggotaan
+Syarat: Mengisi formulir, menunjukkan kartu identitas, dan foto (jika diperlukan).
+Prosedur: Petugas memeriksa data, memproses kartu anggota (cetak/digital), dan mengaktifkan akun. 
+2. SOP Sirkulasi (Peminjaman & Pengembalian) 
+Peminjaman:
+Pemustaka mencari koleksi di rak atau katalog.
+Membawa buku dan kartu anggota ke meja sirkulasi.
+Petugas memindai barcode buku dan kartu.
+Petugas mencatat tanggal kembali dan menyerahkan buku.
+Pengembalian:
+Pemustaka menyerahkan buku ke petugas.
+Petugas memeriksa kondisi fisik buku.
+Petugas memindai pengembalian (clear pinjaman).
+Buku dishelving (dikembalikan ke rak).
+Masa Pinjam: Umumnya 1-2 minggu dengan maksimal 2-3 buku. 
+3. SOP Tata Tertib Pengunjung 
+Wajib menjaga ketenangan dan kebersihan.
+Dilarang merokok, makan, atau minum di dalam ruangan.
+Tidak merusak, mencoret, atau menyobek koleksi.
+Menitipkan tas/barang bawaan besar di loker yang disediakan. 
+4. SOP Bebas Pustaka (Syarat Wisuda/Keluar)
+Pemustaka tidak memiliki tanggungan pinjaman buku.
+Petugas memeriksa data pada database.
+Surat Bebas Pustaka diterbitkan setelah pemustaka melunasi denda (jika ada) dan menyerahkan persyaratan. 
+5. SOP Pengolahan Koleksi
+Inventarisasi: Penerimaan, pengecekan, dan pencatatan buku ke buku induk.
+Klasifikasi & Katalogisasi: Penentuan nomor klasifikasi (DDC) dan input ke sistem.
+Shelving: Pelabelan dan penataan buku di rak sesuai subjek. 
