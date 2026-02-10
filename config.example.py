@@ -1,5 +1,6 @@
-# config.py
-# Konfigurasi database dan model Ollama
+# config.example.py
+# Salin file ini menjadi config.py dan sesuaikan isinya
+# cp config.example.py config.py
 
 # ============================================
 # DATABASE CONFIG
@@ -7,7 +8,7 @@
 DB_CONFIG = {
     "host": "localhost",
     "user": "root",
-    "password": "Sintang2025",
+    "password": "password_anda",
     "database": "smksmartsis"
 }
 
@@ -22,7 +23,7 @@ DB_CONFIG = {
 # - "mistral-small3.2" → Bagus untuk function calling (RAM 16GB)
 # - "granite4:3b"      → Paling ringan (RAM 4GB)
 
-OLLAMA_MODEL = "gpt-oss:120b-cloud"
+OLLAMA_MODEL = "qwen3:8b"
 OLLAMA_BASE_URL = "http://localhost:11434"
 
 # ============================================
