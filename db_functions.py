@@ -408,3 +408,159 @@ def get_persentase_kehadiran(
     cursor.close()
     db.close()
     return result
+
+
+def get_school_settings() -> Dict[str, str]:
+    """Ambil info sekolah dari tabel settings"""
+    db = get_db_connection()
+    cursor = db.cursor(dictionary=True)
+
+    cursor.execute("SELECT `key`, `value` FROM settings")
+    rows = cursor.fetchall()
+
+    cursor.close()
+    db.close()
+
+    settings = {}
+    for row in rows:
+        settings[row["key"]] = row["value"] or ""
+    return settings
+
+
+def get_data_alfa_siswa(
+    nama_siswa: Optional[str] = None,
+    siswa_id: Optional[int] = None
+) -> Dict[str, Any]:
+    """Ambil data lengkap siswa yang alfa: info siswa, daftar tanggal alfa, dan rekap kehadiran"""
+    db = get_db_connection()
+    cursor = db.cursor(dictionary=True)
+
+    if not siswa_id and nama_siswa:
+        siswa_id = _resolve_siswa_id(cursor, nama_siswa)
+        if not siswa_id:
+            cursor.close()
+            db.close()
+            return {"error": f"Siswa dengan nama '{nama_siswa}' tidak ditemukan atau ada lebih dari satu hasil. Gunakan fungsi cari_siswa untuk mencari dulu."}
+
+    if not siswa_id:
+        cursor.close()
+        db.close()
+        return {"error": "Harus menyertakan siswa_id atau nama_siswa"}
+
+    # Info siswa + kelas
+    cursor.execute("""
+        SELECT s.nama, s.nis, s.nama_orang_tua, s.whatsapp_orang_tua,
+               k.nama AS kelas
+        FROM siswa s
+        LEFT JOIN penempatan_kelas pk ON pk.siswa_id = s.id AND pk.status = 'aktif'
+        LEFT JOIN kelas k ON pk.kelas_id = k.id
+        WHERE s.id = %s
+    """, [siswa_id])
+    info = cursor.fetchone()
+
+    # Daftar tanggal alfa
+    cursor.execute("""
+        SELECT a.tanggal
+        FROM absensi a
+        WHERE a.siswa_id = %s AND a.status = 'Alfa'
+        ORDER BY a.tanggal
+    """, [siswa_id])
+    daftar_alfa = [row["tanggal"] for row in cursor.fetchall()]
+
+    # Rekap kehadiran total
+    cursor.execute("""
+        SELECT
+            COUNT(CASE WHEN a.status = 'Hadir' THEN 1 END) AS total_hadir,
+            COUNT(CASE WHEN a.status = 'Sakit' THEN 1 END) AS total_sakit,
+            COUNT(CASE WHEN a.status = 'Izin' THEN 1 END)  AS total_izin,
+            COUNT(CASE WHEN a.status = 'Alfa' THEN 1 END)  AS total_alfa,
+            COUNT(*) AS total_hari
+        FROM absensi a
+        WHERE a.siswa_id = %s
+    """, [siswa_id])
+    rekap = cursor.fetchone()
+
+    cursor.close()
+    db.close()
+
+    persen = 0.0
+    if rekap and rekap["total_hari"] > 0:
+        persen = round(rekap["total_hadir"] * 100.0 / rekap["total_hari"], 1)
+
+    return {
+        "siswa": info,
+        "daftar_tanggal_alfa": daftar_alfa,
+        "rekap": rekap,
+        "persentase_kehadiran": persen
+    }
+
+
+def get_data_alfa_harian(
+    tanggal: Optional[str] = None
+) -> Dict[str, Any]:
+    """Ambil daftar semua siswa yang alfa pada tanggal tertentu"""
+    db = get_db_connection()
+    cursor = db.cursor(dictionary=True)
+
+    if not tanggal:
+        tanggal = date.today().isoformat()
+
+    cursor.execute("""
+        SELECT s.nama AS nama_siswa, s.nis, k.nama AS kelas
+        FROM absensi a
+        JOIN siswa s ON a.siswa_id = s.id
+        JOIN kelas k ON a.kelas_id = k.id
+        WHERE a.tanggal = %s AND a.status = 'Alfa'
+        ORDER BY k.nama, s.nama
+    """, [tanggal])
+    daftar = cursor.fetchall()
+
+    cursor.close()
+    db.close()
+
+    return {
+        "tanggal": tanggal,
+        "total": len(daftar),
+        "daftar_siswa": daftar
+    }
+
+
+def buat_surat_peringatan_alfa(
+    nama_siswa: Optional[str] = None,
+    siswa_id: Optional[int] = None
+) -> Dict[str, Any]:
+    """Buat surat peringatan PDF untuk siswa yang alfa"""
+    from pdf_generator import generate_surat_peringatan
+
+    data = get_data_alfa_siswa(nama_siswa=nama_siswa, siswa_id=siswa_id)
+    if "error" in data:
+        return data
+
+    if not data["daftar_tanggal_alfa"]:
+        nama = data["siswa"].get("nama", nama_siswa or siswa_id)
+        return {"pesan": f"Siswa {nama} tidak memiliki catatan alfa. Surat tidak dibuat."}
+
+    school_info = get_school_settings()
+    path = generate_surat_peringatan(data, school_info)
+    return {
+        "pesan": f"Surat peringatan berhasil dibuat untuk {data['siswa']['nama']}",
+        "file": path,
+        "total_alfa": len(data["daftar_tanggal_alfa"]),
+        "persentase_kehadiran": data["persentase_kehadiran"]
+    }
+
+
+def buat_laporan_alfa(
+    tanggal: Optional[str] = None
+) -> Dict[str, Any]:
+    """Buat laporan PDF daftar siswa alfa pada tanggal tertentu"""
+    from pdf_generator import generate_laporan_alfa
+
+    data = get_data_alfa_harian(tanggal=tanggal)
+    school_info = get_school_settings()
+    path = generate_laporan_alfa(data, school_info)
+    return {
+        "pesan": f"Laporan alfa berhasil dibuat untuk tanggal {data['tanggal']}",
+        "file": path,
+        "total_siswa_alfa": data["total"]
+    }

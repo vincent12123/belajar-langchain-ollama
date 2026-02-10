@@ -200,5 +200,41 @@ tools = [
                 }
             }
         }
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "buat_surat_peringatan_alfa",
+            "description": "Membuat surat peringatan dalam bentuk PDF untuk siswa yang alfa (tidak hadir tanpa keterangan). Surat berisi kop sekolah, data siswa, daftar tanggal alfa, rekap kehadiran, dan tanda tangan kepala sekolah.",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "nama_siswa": {
+                        "type": "string",
+                        "description": "Nama siswa yang akan dibuatkan surat peringatan"
+                    },
+                    "siswa_id": {
+                        "type": "integer",
+                        "description": "ID siswa (opsional jika nama_siswa diisi)"
+                    }
+                }
+            }
+        }
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "buat_laporan_alfa",
+            "description": "Membuat laporan PDF daftar semua siswa yang alfa (tidak hadir tanpa keterangan) pada tanggal tertentu. Berisi kop sekolah, tabel daftar siswa alfa, dan tanda tangan.",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "tanggal": {
+                        "type": "string",
+                        "description": "Tanggal dalam format YYYY-MM-DD. Default: hari ini"
+                    }
+                }
+            }
+        }
     }
 ]

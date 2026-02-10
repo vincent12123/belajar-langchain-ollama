@@ -14,6 +14,8 @@ from db_functions import (
     get_rekap_absensi,
     get_rekap_absensi_bulanan,
     get_persentase_kehadiran,
+    buat_surat_peringatan_alfa,
+    buat_laporan_alfa,
 )
 
 
@@ -29,6 +31,8 @@ available_functions = {
     "get_rekap_absensi": get_rekap_absensi,
     "get_rekap_absensi_bulanan": get_rekap_absensi_bulanan,
     "get_persentase_kehadiran": get_persentase_kehadiran,
+    "buat_surat_peringatan_alfa": buat_surat_peringatan_alfa,
+    "buat_laporan_alfa": buat_laporan_alfa,
 }
 
 
