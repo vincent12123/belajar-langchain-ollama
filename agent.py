@@ -16,6 +16,9 @@ from db_functions import (
     get_persentase_kehadiran,
     buat_surat_peringatan_alfa,
     buat_laporan_alfa,
+    get_attendance_trends,
+    get_geolocation_analysis,
+    compare_class_attendance,
 )
 
 
@@ -33,6 +36,9 @@ available_functions = {
     "get_persentase_kehadiran": get_persentase_kehadiran,
     "buat_surat_peringatan_alfa": buat_surat_peringatan_alfa,
     "buat_laporan_alfa": buat_laporan_alfa,
+    "get_attendance_trends": get_attendance_trends,
+    "get_geolocation_analysis": get_geolocation_analysis,
+    "compare_class_attendance": compare_class_attendance,
 }
 
 

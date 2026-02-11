@@ -1,0 +1,9 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(dir test*.py)",
+      "Bash(dir)",
+      "Bash(python -c \"from db_functions import get_attendance_trends, get_geolocation_analysis, compare_class_attendance; print\\(''All new functions imported successfully''\\)\")"
+    ]
+  }
+}

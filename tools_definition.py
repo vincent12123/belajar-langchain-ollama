@@ -236,5 +236,81 @@ tools = [
                 }
             }
         }
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "get_attendance_trends",
+            "description": "Analyze attendance trends for a student or class over multiple months to identify patterns and improvements/deteriorations",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "siswa_id": {
+                        "type": "integer",
+                        "description": "ID unik siswa di database (opsional jika nama_siswa diisi)"
+                    },
+                    "nama_siswa": {
+                        "type": "string",
+                        "description": "Nama siswa, bisa sebagian nama (opsional jika siswa_id diisi)"
+                    },
+                    "kelas_id": {
+                        "type": "integer",
+                        "description": "ID kelas (opsional jika nama_kelas diisi)"
+                    },
+                    "nama_kelas": {
+                        "type": "string",
+                        "description": "Nama kelas, misal 'X RPL 1', 'XI TKJ 2' (opsional jika kelas_id diisi)"
+                    },
+                    "months": {
+                        "type": "integer",
+                        "description": "Number of months to analyze (default: 6)"
+                    }
+                }
+            }
+        }
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "get_geolocation_analysis",
+            "description": "Analyze geolocation data for attendance validation and detect anomalies in student locations",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "kelas_id": {
+                        "type": "integer",
+                        "description": "ID kelas (opsional jika nama_kelas diisi)"
+                    },
+                    "nama_kelas": {
+                        "type": "string",
+                        "description": "Nama kelas, misal 'X RPL 1', 'XI TKJ 2' (opsional jika kelas_id diisi)"
+                    },
+                    "tanggal": {
+                        "type": "string",
+                        "description": "Specific date for analysis in YYYY-MM-DD format (opsional)"
+                    }
+                }
+            }
+        }
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "compare_class_attendance",
+            "description": "Compare attendance rates between different classes to identify patterns and performance differences",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "tingkat": {
+                        "type": "integer",
+                        "description": "Grade level (10, 11, 12) (opsional)"
+                    },
+                    "jurusan": {
+                        "type": "string",
+                        "description": "Department (RPL, TKJ, etc.) (opsional)"
+                    }
+                }
+            }
+        }
     }
 ]

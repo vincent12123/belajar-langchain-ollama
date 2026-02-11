@@ -550,6 +550,245 @@ def buat_surat_peringatan_alfa(
     }
 
 
+def get_attendance_trends(
+    siswa_id: Optional[int] = None,
+    nama_siswa: Optional[str] = None,
+    kelas_id: Optional[int] = None,
+    nama_kelas: Optional[str] = None,
+    months: int = 6
+) -> Dict[str, Any]:
+    """Analyze attendance trends for a student or class over multiple months to identify patterns and improvements/deteriorations"""
+    db = get_db_connection()
+    cursor = db.cursor(dictionary=True)
+
+    # Resolve student ID if name provided
+    if not siswa_id and nama_siswa:
+        siswa_id = _resolve_siswa_id(cursor, nama_siswa)
+        if not siswa_id:
+            cursor.close()
+            db.close()
+            return {"error": f"Siswa dengan nama '{nama_siswa}' tidak ditemukan atau ada lebih dari satu hasil. Gunakan fungsi cari_siswa untuk mencari dulu."}
+
+    # Resolve class ID if name provided
+    if not kelas_id and nama_kelas:
+        kelas_id = _resolve_kelas_id(cursor, nama_kelas)
+        if not kelas_id:
+            cursor.close()
+            db.close()
+            return {"error": f"Kelas dengan nama '{nama_kelas}' tidak ditemukan atau ada lebih dari satu hasil. Coba gunakan nama kelas yang lebih spesifik."}
+
+    # Build query based on whether we're analyzing student or class
+    if siswa_id:
+        query = """
+            SELECT
+                YEAR(a.tanggal) AS tahun,
+                MONTH(a.tanggal) AS bulan,
+                COUNT(CASE WHEN a.status = 'Hadir' THEN 1 END) AS hadir,
+                COUNT(*) AS total_hari,
+                ROUND(COUNT(CASE WHEN a.status = 'Hadir' THEN 1 END) * 100.0 / COUNT(*), 1) AS persen_hadir
+            FROM absensi a
+            WHERE a.siswa_id = %s
+            GROUP BY YEAR(a.tanggal), MONTH(a.tanggal)
+            ORDER BY tahun DESC, bulan DESC
+            LIMIT %s
+        """
+        params = [siswa_id, months]
+    elif kelas_id:
+        query = """
+            SELECT
+                YEAR(a.tanggal) AS tahun,
+                MONTH(a.tanggal) AS bulan,
+                COUNT(CASE WHEN a.status = 'Hadir' THEN 1 END) AS hadir,
+                COUNT(*) AS total_hari,
+                ROUND(COUNT(CASE WHEN a.status = 'Hadir' THEN 1 END) * 100.0 / COUNT(*), 1) AS persen_hadir
+            FROM absensi a
+            WHERE a.kelas_id = %s
+            GROUP BY YEAR(a.tanggal), MONTH(a.tanggal)
+            ORDER BY tahun DESC, bulan DESC
+            LIMIT %s
+        """
+        params = [kelas_id, months]
+    else:
+        cursor.close()
+        db.close()
+        return {"error": "Harus menyertakan siswa_id/nama_siswa atau kelas_id/nama_kelas"}
+
+    cursor.execute(query, params)
+    monthly_data = cursor.fetchall()
+
+    # Calculate trends (improvement/deterioration)
+    for i in range(len(monthly_data) - 1):
+        current_percentage = monthly_data[i]["persen_hadir"]
+        next_percentage = monthly_data[i + 1]["persen_hadir"]
+        if current_percentage > next_percentage:
+            monthly_data[i]["trend"] = "meningkat"
+        elif current_percentage < next_percentage:
+            monthly_data[i]["trend"] = "menurun"
+        else:
+            monthly_data[i]["trend"] = "stabil"
+
+    # Last entry has no comparison
+    if monthly_data:
+        monthly_data[-1]["trend"] = "terbaru"
+
+    cursor.close()
+    db.close()
+
+    return {
+        "periode_analisis": f"{months} bulan terakhir",
+        "data": monthly_data
+    }
+
+
+def get_geolocation_analysis(
+    kelas_id: Optional[int] = None,
+    nama_kelas: Optional[str] = None,
+    tanggal: Optional[str] = None
+) -> Dict[str, Any]:
+    """Analyze geolocation data for attendance validation and detect anomalies in student locations"""
+    db = get_db_connection()
+    cursor = db.cursor(dictionary=True)
+
+    # Resolve class ID if name provided
+    if not kelas_id and nama_kelas:
+        kelas_id = _resolve_kelas_id(cursor, nama_kelas)
+        if not kelas_id:
+            cursor.close()
+            db.close()
+            return {"error": f"Kelas dengan nama '{nama_kelas}' tidak ditemukan atau ada lebih dari satu hasil. Coba gunakan nama kelas yang lebih spesifik."}
+
+    # Base query for geolocation analysis
+    query = """
+        SELECT
+            a.id,
+            s.nama AS nama_siswa,
+            s.nis,
+            k.nama AS kelas,
+            a.tanggal,
+            a.latitude,
+            a.longitude,
+            a.status
+        FROM absensi a
+        JOIN siswa s ON a.siswa_id = s.id
+        JOIN kelas k ON a.kelas_id = k.id
+        WHERE a.latitude IS NOT NULL AND a.longitude IS NOT NULL
+    """
+    params = []
+
+    # Add filters
+    if kelas_id:
+        query += " AND a.kelas_id = %s"
+        params.append(kelas_id)
+
+    if tanggal:
+        query += " AND a.tanggal = %s"
+        params.append(tanggal)
+
+    query += " ORDER BY a.tanggal DESC, k.nama, s.nama LIMIT 100"
+
+    cursor.execute(query, params)
+    records = cursor.fetchall()
+
+    # Statistics
+    total_records = len(records)
+    valid_coordinates = len([r for r in records if r["latitude"] and r["longitude"]])
+    percentage_valid = round((valid_coordinates / total_records * 100), 1) if total_records > 0 else 0
+
+    # Detect anomalies (simplified - identical coordinates for multiple students)
+    coordinate_groups = {}
+    for record in records:
+        coord_key = f"{record['latitude']},{record['longitude']}"
+        if coord_key not in coordinate_groups:
+            coordinate_groups[coord_key] = []
+        coordinate_groups[coord_key].append(record)
+
+    # Find groups with multiple students at same location
+    suspicious_locations = []
+    for coord_key, group in coordinate_groups.items():
+        if len(group) > 3:  # More than 3 students at same location is suspicious
+            suspicious_locations.append({
+                "coordinates": coord_key,
+                "student_count": len(group),
+                "students": [f"{s['nama_siswa']} ({s['nis']})" for s in group[:5]],  # Show first 5
+                "tanggal": group[0]["tanggal"]
+            })
+
+    cursor.close()
+    db.close()
+
+    return {
+        "total_records": total_records,
+        "valid_coordinates": valid_coordinates,
+        "percentage_valid_coordinates": percentage_valid,
+        "suspicious_locations": suspicious_locations[:10],  # Limit to 10 suspicious cases
+        "flagged_records_count": len(suspicious_locations)
+    }
+
+
+def compare_class_attendance(
+    tingkat: Optional[int] = None,
+    jurusan: Optional[str] = None
+) -> Dict[str, Any]:
+    """Compare attendance rates between different classes to identify patterns and performance differences"""
+    db = get_db_connection()
+    cursor = db.cursor(dictionary=True)
+
+    # Query to get class attendance statistics
+    query = """
+        SELECT
+            k.id AS kelas_id,
+            k.nama AS kelas,
+            COUNT(CASE WHEN a.status = 'Hadir' THEN 1 END) AS hadir,
+            COUNT(*) AS total_hari,
+            ROUND(COUNT(CASE WHEN a.status = 'Hadir' THEN 1 END) * 100.0 / COUNT(*), 1) AS persen_hadir
+        FROM absensi a
+        JOIN kelas k ON a.kelas_id = k.id
+        WHERE 1=1
+    """
+    params = []
+
+    # Add filters
+    if tingkat:
+        query += " AND k.tingkat = %s"
+        params.append(tingkat)
+
+    if jurusan:
+        query += " AND k.jurusan = %s"
+        params.append(jurusan)
+
+    query += """
+        GROUP BY k.id, k.nama
+        HAVING total_hari > 0
+        ORDER BY persen_hadir DESC
+    """
+
+    cursor.execute(query, params)
+    class_stats = cursor.fetchall()
+
+    # Calculate overall statistics
+    if class_stats:
+        avg_attendance = round(sum(c["persen_hadir"] for c in class_stats) / len(class_stats), 1)
+        best_class = class_stats[0]
+        worst_class = class_stats[-1]
+    else:
+        avg_attendance = 0
+        best_class = None
+        worst_class = None
+
+    cursor.close()
+    db.close()
+
+    return {
+        "filter_tingkat": tingkat,
+        "filter_jurusan": jurusan,
+        "total_kelas": len(class_stats),
+        "rata_rata_kehadiran": avg_attendance,
+        "kelas_terbaik": best_class,
+        "kelas_terendah": worst_class,
+        "perbandingan_kelas": class_stats
+    }
+
+
 def buat_laporan_alfa(
     tanggal: Optional[str] = None
 ) -> Dict[str, Any]:
