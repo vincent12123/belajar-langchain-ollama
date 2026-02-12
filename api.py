@@ -1,8 +1,10 @@
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, HTTPException, WebSocket, WebSocketDisconnect
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import FileResponse
 from pydantic import BaseModel
 from typing import Optional
 import asyncio
+import os
 import logging
 
 # Configure logging
@@ -142,6 +144,58 @@ async def compare_class_attendance_api(request: ClassComparisonRequest):
     except Exception as e:
         logger.error(f"Class comparison error: {e}")
         raise HTTPException(status_code=500, detail=str(e))
+
+@app.websocket("/ws/{client_id}")
+async def websocket_endpoint(websocket: WebSocket, client_id: str):
+    await websocket.accept()
+    try:
+        await websocket.send_text(f"Connected to EduAttendAI as {client_id}")
+        while True:
+            data = await websocket.receive_text()
+            
+            # Proses pesan menggunakan AI Agent
+            if BACKEND_READY:
+                # Gunakan executor agar tidak memblokir event loop async
+                loop = asyncio.get_event_loop()
+                response = await loop.run_in_executor(None, run_agent, data)
+                await websocket.send_text(response)
+            else:
+                await websocket.send_text("Maaf, layanan backend AI sedang tidak tersedia.")
+                
+    except WebSocketDisconnect:
+        logger.info(f"Client #{client_id} disconnected")
+    except Exception as e:
+        logger.error(f"WebSocket error: {e}")
+        try:
+            await websocket.send_text(f"Error: {str(e)}")
+        except:
+            pass
+
+
+# ── File download endpoint for generated PDFs ──
+OUTPUT_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "output")
+
+@app.get("/files")
+def list_files():
+    """List available files in the output directory."""
+    if not os.path.exists(OUTPUT_DIR):
+        return {"files": []}
+    files = [f for f in os.listdir(OUTPUT_DIR) if os.path.isfile(os.path.join(OUTPUT_DIR, f))]
+    return {"files": files}
+
+@app.get("/download/{filename}")
+def download_file(filename: str):
+    """Download a generated file (PDF, etc.) from the output directory."""
+    # Sanitize: prevent path traversal
+    safe_name = os.path.basename(filename)
+    filepath = os.path.join(OUTPUT_DIR, safe_name)
+    if not os.path.exists(filepath):
+        raise HTTPException(status_code=404, detail=f"File '{safe_name}' not found")
+    return FileResponse(
+        path=filepath,
+        filename=safe_name,
+        media_type="application/octet-stream",
+    )
 
 if __name__ == "__main__":
     import uvicorn
