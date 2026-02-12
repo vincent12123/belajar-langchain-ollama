@@ -66,6 +66,7 @@ def run_agent(user_message: str, model: str = None) -> str:
     3. Tool dieksekusi → query ke MySQL
     4. Hasil dikirim balik ke LLM
     5. LLM merangkum jawaban dalam bahasa natural
+    6. LLM memberikan analisis 
     """
     
     if model is None:

@@ -18,3 +18,30 @@
 .bubble-ai {
   border-bottom-left-radius: 2px;
 }
+
+/* Date suggestion animations */
+@keyframes slideInFromTop {
+  from {
+    opacity: 0;
+    transform: translateY(-8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+.animate-in.slide-in-from-top-1 {
+  animation: slideInFromTop 0.2s ease-out;
+}
+
+/* Date input styling */
+input[type="date"] {
+  color-scheme: light;
+}
+input[type="date"]::-webkit-calendar-picker-indicator {
+  cursor: pointer;
+  opacity: 0.6;
+}
+input[type="date"]::-webkit-calendar-picker-indicator:hover {
+  opacity: 1;
+}

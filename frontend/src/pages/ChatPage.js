@@ -9,6 +9,7 @@ import {
 import '@llamaindex/chat-ui/styles/markdown.css';
 import '../custom-styles.css';
 import PdfDownloadDetector from '../components/PdfDownloadDetector';
+import DateSuggestion from '../components/DateSuggestion';
 
 const SUGGESTED_QUESTIONS = [
   { label: "Absen Hari Ini", text: "Siapa saja yang tidak hadir hari ini?" },
@@ -34,13 +35,11 @@ const ChatPage = () => {
   };
 
   const handleSuggestionClick = (text) => {
-    if (handler.handleSubmit) {
-      handler.setInput(text);
-      setTimeout(() => {
-        const fakeEvent = { preventDefault: () => {} };
-        handler.handleSubmit(fakeEvent);
-      }, 50);
-    }
+    handler.sendMessage({ text });
+  };
+
+  const handleDateSelect = (_label, dateText) => {
+    handler.sendMessage({ text: dateText });
   };
 
   return (
@@ -149,6 +148,7 @@ const ChatPage = () => {
               )}
             </div>
             <PdfDownloadDetector messages={handler.messages} />
+            <DateSuggestion messages={handler.messages} onSelectDate={handleDateSelect} />
             <div className="border-t border-border bg-white p-4">
               <div className="max-w-4xl mx-auto">
                 <ChatInput>
