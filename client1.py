@@ -652,26 +652,36 @@ class ChatApp:
 
     async def websocket_connection(self):
         uri = f"ws://{SERVER_HOST}:{SERVER_PORT}/ws/{self.client_id}"
-        try:
-            async with websockets.connect(uri) as websocket:
-                self.websocket = websocket
-                self.root.after(0, self.update_status, "Connected to server", True)
-                self.root.after(0, self.display_system_message, "Connected — You can start chatting")
+        
+        while True:
+            try:
+                self.root.after(0, self.update_status, "Connecting…", False)
+                async with websockets.connect(uri) as websocket:
+                    self.websocket = websocket
+                    self.root.after(0, self.update_status, "Connected to server", True)
+                    self.root.after(0, self.display_system_message, "Connected — You can start chatting")
 
-                while True:
-                    try:
-                        message = await websocket.recv()
-                        self.root.after(0, self.display_message, message, False)
-                    except websockets.exceptions.ConnectionClosed:
-                        self.root.after(0, self.update_status, "Server disconnected", False)
-                        self.root.after(0, self.display_system_message, "Connection closed by server")
-                        break
-                    except Exception as e:
-                        self.root.after(0, self.update_status, f"Error: {e}", False)
-                        break
-        except Exception as e:
-            self.root.after(0, self.update_status, f"Cannot reach server", False)
-            self.root.after(0, self.display_system_message, f"Could not connect: {e}")
+                    while True:
+                        try:
+                            message = await websocket.recv()
+                            self.root.after(0, self.display_message, message, False)
+                        except websockets.exceptions.ConnectionClosed:
+                            self.root.after(0, self.update_status, "Server disconnected", False)
+                            self.root.after(0, self.display_system_message, "Connection closed by server")
+                            break
+                        except Exception as e:
+                            self.root.after(0, self.update_status, f"Error: {e}", False)
+                            break
+            
+            except (OSError, asyncio.TimeoutError, websockets.exceptions.InvalidURI, websockets.exceptions.InvalidHandshake) as e:
+                self.root.after(0, self.update_status, "Offline (Retrying...)", False)
+                # Tunggu 3 detik sebelum mencoba connect lagi
+                await asyncio.sleep(3)
+            except Exception as e:
+                self.root.after(0, self.update_status, f"Error: {e}", False)
+                await asyncio.sleep(5)
+            finally:
+                self.websocket = None
 
 
 if __name__ == "__main__":
