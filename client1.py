@@ -7,6 +7,8 @@ import tempfile
 from datetime import datetime
 from urllib.request import urlretrieve
 from urllib.error import URLError
+from urllib.parse import quote
+import shutil
 
 import tkinter as tk
 from tkinter import font as tkfont
@@ -20,6 +22,9 @@ from ttkbootstrap.constants import *
 SERVER_HOST = "localhost"
 SERVER_PORT = 8000
 BASE_URL = f"http://{SERVER_HOST}:{SERVER_PORT}"
+
+# Local output directory (same machine as server)
+LOCAL_OUTPUT_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "output")
 
 # ── Color palette ──
 BG_DARK = "#1e1e2e"       # main background
@@ -571,9 +576,7 @@ class ChatApp:
             self.chat_area.config(cursor="arrow")
 
     def _download_file(self, filename: str):
-        """Download file from server and open or save it."""
-        url = f"{BASE_URL}/download/{filename}"
-
+        """Download file from server, or copy from local output dir as fallback."""
         # Ask user where to save
         save_path = filedialog.asksaveasfilename(
             initialfile=filename,
@@ -584,14 +587,38 @@ class ChatApp:
         if not save_path:
             return  # user cancelled
 
+        # ── Strategy 1: Try local copy first (faster, no server needed) ──
+        local_path = os.path.join(LOCAL_OUTPUT_DIR, filename)
+        if os.path.exists(local_path):
+            try:
+                shutil.copy2(local_path, save_path)
+                self.display_system_message(f"File saved: {os.path.basename(save_path)}")
+                if messagebox.askyesno("File Saved", f"File saved to:\n{save_path}\n\nOpen now?"):
+                    os.startfile(save_path)
+                return
+            except Exception:
+                pass  # fall through to server download
+
+        # ── Strategy 2: Download from server with URL-encoded filename ──
+        encoded_name = quote(filename, safe="")
+        url = f"{BASE_URL}/download/{encoded_name}"
+
         try:
             urlretrieve(url, save_path)
             self.display_system_message(f"File saved: {os.path.basename(save_path)}")
-            # Ask to open
             if messagebox.askyesno("File Downloaded", f"File saved to:\n{save_path}\n\nOpen now?"):
                 os.startfile(save_path)
         except URLError as e:
-            messagebox.showerror("Download Error", f"Could not download file:\n{e}")
+            messagebox.showerror(
+                "Download Error",
+                f"Could not download file.\n\n"
+                f"Filename: {filename}\n"
+                f"URL: {url}\n"
+                f"Local path: {local_path}\n\n"
+                f"Error: {e}\n\n"
+                f"Make sure the API server (api.py) is running\n"
+                f"and the file exists in the output/ folder."
+            )
         except Exception as e:
             messagebox.showerror("Error", f"An error occurred:\n{e}")
 
