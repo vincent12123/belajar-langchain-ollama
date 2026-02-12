@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { compareClassAttendance } from '../services/api';
+import { getClassComparison } from '../services/api';
 import { Bar } from 'react-chartjs-2';
 import {
   Chart as ChartJS,
@@ -49,7 +49,7 @@ const ClassComparisonPage = () => {
       if (formData.tingkat) params.tingkat = parseInt(formData.tingkat);
       if (formData.jurusan) params.jurusan = formData.jurusan;
 
-      const response = await compareClassAttendance(params);
+      const response = await getClassComparison(params);
       setResult(response);
     } catch (err) {
       setError(err.message);

@@ -27,7 +27,7 @@ app.add_middleware(
 # Models
 class QueryRequest(BaseModel):
     query: str
-    model: str = None  # Optional, will use default if None
+    model: Optional[str] = None  # Optional, will use default if None
 
 class QueryResponse(BaseModel):
     answer: str

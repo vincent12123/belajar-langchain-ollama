@@ -12,7 +12,7 @@ const api = axios.create({
 // Chat API
 export const chatWithAI = async (message, model = null) => {
   try {
-    const response = await api.post('/chat', { message, model });
+    const response = await api.post('/chat', { query: message, model });
     return response.data;
   } catch (error) {
     throw new Error(error.response?.data?.detail || 'Failed to chat with AI');

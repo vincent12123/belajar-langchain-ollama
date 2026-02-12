@@ -1,0 +1,20 @@
+.custom-scrollbar::-webkit-scrollbar {
+  width: 6px;
+}
+.custom-scrollbar::-webkit-scrollbar-track {
+  background: transparent;
+}
+.custom-scrollbar::-webkit-scrollbar-thumb {
+  background-color: #cbd5e1;
+  border-radius: 20px;
+}
+.dark .custom-scrollbar::-webkit-scrollbar-thumb {
+  background-color: #334155;
+}
+/* Message bubble tails */
+.bubble-user {
+  border-bottom-right-radius: 2px;
+}
+.bubble-ai {
+  border-bottom-left-radius: 2px;
+}
