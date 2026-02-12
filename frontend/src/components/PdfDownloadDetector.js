@@ -8,7 +8,7 @@ import { downloadFile } from '../services/api';
 const PdfDownloadDetector = ({ messages }) => {
   const pdfFiles = useMemo(() => {
     const files = new Set();
-    const pdfPattern = /([\w/\\:.\-]+\.pdf)/gi;
+    const pdfPattern = /([\w/\\:.-]+\.pdf)/gi;
 
     for (const msg of messages) {
       if (msg.role !== 'assistant') continue;
