@@ -19,6 +19,13 @@ from db_functions import (
     get_attendance_trends,
     get_geolocation_analysis,
     compare_class_attendance,
+    get_ringkasan_absensi_harian,
+    get_ringkasan_absensi_range,
+    get_rekap_absensi_kelas_range,
+    get_top_siswa_absensi,
+    get_analisis_metode_absen,
+    get_anomali_absensi,
+    get_statistik_waktu_absen,
 )
 
 
@@ -39,6 +46,13 @@ available_functions = {
     "get_attendance_trends": get_attendance_trends,
     "get_geolocation_analysis": get_geolocation_analysis,
     "compare_class_attendance": compare_class_attendance,
+    "get_ringkasan_absensi_harian": get_ringkasan_absensi_harian,
+    "get_ringkasan_absensi_range": get_ringkasan_absensi_range,
+    "get_rekap_absensi_kelas_range": get_rekap_absensi_kelas_range,
+    "get_top_siswa_absensi": get_top_siswa_absensi,
+    "get_analisis_metode_absen": get_analisis_metode_absen,
+    "get_anomali_absensi": get_anomali_absensi,
+    "get_statistik_waktu_absen": get_statistik_waktu_absen,
 }
 
 

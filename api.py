@@ -51,13 +51,36 @@ class ClassComparisonRequest(BaseModel):
     tingkat: Optional[int] = None
     jurusan: Optional[str] = None
 
+class AnomaliAbsensiRequest(BaseModel):
+    kelas_id: Optional[int] = None
+    nama_kelas: Optional[str] = None
+    tanggal_mulai: Optional[str] = None
+    tanggal_akhir: Optional[str] = None
+
+class AnalisisMetodeAbsenRequest(BaseModel):
+    kelas_id: Optional[int] = None
+    nama_kelas: Optional[str] = None
+    tanggal_mulai: Optional[str] = None
+    tanggal_akhir: Optional[str] = None
+
+class TopSiswaRequest(BaseModel):
+    kelas_id: Optional[int] = None
+    nama_kelas: Optional[str] = None
+    tanggal_mulai: Optional[str] = None
+    tanggal_akhir: Optional[str] = None
+    status: Optional[str] = "Alfa"
+    limit: Optional[int] = 10
+
 # Import your existing functions
 try:
     from agent import run_agent
     from db_functions import (
         get_attendance_trends,
         get_geolocation_analysis,
-        compare_class_attendance
+        compare_class_attendance,
+        get_anomali_absensi,
+        get_analisis_metode_absen,
+        get_top_siswa_absensi
     )
     BACKEND_READY = True
 except ImportError as e:
@@ -143,6 +166,71 @@ async def compare_class_attendance_api(request: ClassComparisonRequest):
         return result
     except Exception as e:
         logger.error(f"Class comparison error: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.post("/api/anomali/absensi")
+async def get_anomali_absensi_api(request: AnomaliAbsensiRequest):
+    """Get anomaly analysis for attendance"""
+    if not BACKEND_READY:
+        raise HTTPException(status_code=503, detail="Backend services not available")
+
+    try:
+        loop = asyncio.get_event_loop()
+        result = await loop.run_in_executor(
+            None,
+            get_anomali_absensi,
+            request.kelas_id,
+            request.nama_kelas,
+            request.tanggal_mulai,
+            request.tanggal_akhir
+        )
+        return result
+    except Exception as e:
+        logger.error(f"Anomali absensi error: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.post("/api/analisis/metode")
+async def get_analisis_metode_api(request: AnalisisMetodeAbsenRequest):
+    """Get analysis of attendance methods"""
+    if not BACKEND_READY:
+        raise HTTPException(status_code=503, detail="Backend services not available")
+
+    try:
+        loop = asyncio.get_event_loop()
+        result = await loop.run_in_executor(
+            None,
+            get_analisis_metode_absen,
+            request.kelas_id,
+            request.nama_kelas,
+            request.tanggal_mulai,
+            request.tanggal_akhir
+        )
+        return result
+    except Exception as e:
+        logger.error(f"Analisis metode error: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.post("/api/top/siswa")
+async def get_top_siswa_api(request: TopSiswaRequest):
+    """Get top students based on attendance status"""
+    if not BACKEND_READY:
+        raise HTTPException(status_code=503, detail="Backend services not available")
+
+    try:
+        loop = asyncio.get_event_loop()
+        result = await loop.run_in_executor(
+            None,
+            get_top_siswa_absensi,
+            request.kelas_id,
+            request.nama_kelas,
+            request.tanggal_mulai,
+            request.tanggal_akhir,
+            request.status,
+            request.limit
+        )
+        return result
+    except Exception as e:
+        logger.error(f"Top siswa error: {e}")
         raise HTTPException(status_code=500, detail=str(e))
 
 @app.websocket("/ws/{client_id}")

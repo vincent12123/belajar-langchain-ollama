@@ -803,3 +803,557 @@ def buat_laporan_alfa(
         "file": path,
         "total_siswa_alfa": data["total"]
     }
+# ==========================
+# Tambahan Kategori A (Absensi Lanjutan)
+# ==========================
+
+def get_ringkasan_absensi_harian(
+    kelas_id: Optional[int] = None,
+    nama_kelas: Optional[str] = None,
+    tanggal: Optional[str] = None
+) -> Dict[str, Any]:
+    """
+    Ringkasan absensi 1 kelas pada 1 tanggal: total Hadir/Izin/Sakit/Alfa + persentase hadir.
+    Cocok untuk dashboard harian wali kelas.
+    """
+    db = get_db_connection()
+    cursor = db.cursor(dictionary=True)
+
+    if not kelas_id and nama_kelas:
+        kelas_id = _resolve_kelas_id(cursor, nama_kelas)
+        if not kelas_id:
+            cursor.close()
+            db.close()
+            return {"error": f"Kelas dengan nama '{nama_kelas}' tidak ditemukan atau ada lebih dari satu hasil. Coba gunakan nama kelas yang lebih spesifik."}
+
+    if not kelas_id:
+        cursor.close()
+        db.close()
+        return {"error": "Harus menyertakan kelas_id atau nama_kelas"}
+
+    if not tanggal:
+        tanggal = date.today().isoformat()
+
+    query = """
+        SELECT
+            k.nama AS kelas,
+            a.tanggal,
+            COUNT(*) AS total_record,
+            COUNT(CASE WHEN a.status = 'Hadir' THEN 1 END) AS hadir,
+            COUNT(CASE WHEN a.status = 'Izin' THEN 1 END)  AS izin,
+            COUNT(CASE WHEN a.status = 'Sakit' THEN 1 END) AS sakit,
+            COUNT(CASE WHEN a.status = 'Alfa' THEN 1 END)  AS alfa,
+            ROUND(COUNT(CASE WHEN a.status = 'Hadir' THEN 1 END) * 100.0 / COUNT(*), 1) AS persen_hadir
+        FROM absensi a
+        JOIN kelas k ON a.kelas_id = k.id
+        WHERE a.kelas_id = %s AND a.tanggal = %s
+        GROUP BY k.nama, a.tanggal
+    """
+    cursor.execute(query, [kelas_id, tanggal])
+    summary = cursor.fetchone()
+
+    # Jika tidak ada record, tetap kembalikan struktur yang konsisten
+    if not summary:
+        cursor.execute("SELECT nama FROM kelas WHERE id = %s LIMIT 1", [kelas_id])
+        row = cursor.fetchone()
+        kelas_nama = row["nama"] if row else None
+        summary = {
+            "kelas": kelas_nama,
+            "tanggal": tanggal,
+            "total_record": 0,
+            "hadir": 0,
+            "izin": 0,
+            "sakit": 0,
+            "alfa": 0,
+            "persen_hadir": 0
+        }
+
+    cursor.close()
+    db.close()
+    return summary
+
+
+def get_ringkasan_absensi_range(
+    kelas_id: Optional[int] = None,
+    nama_kelas: Optional[str] = None,
+    tanggal_mulai: str = "",
+    tanggal_akhir: str = ""
+) -> Dict[str, Any]:
+    """
+    Ringkasan absensi per hari untuk 1 kelas pada rentang tanggal (untuk grafik/tren).
+    Return: list per tanggal: total/hadir/izin/sakit/alfa/persen_hadir
+    """
+    db = get_db_connection()
+    cursor = db.cursor(dictionary=True)
+
+    if not kelas_id and nama_kelas:
+        kelas_id = _resolve_kelas_id(cursor, nama_kelas)
+        if not kelas_id:
+            cursor.close()
+            db.close()
+            return {"error": f"Kelas dengan nama '{nama_kelas}' tidak ditemukan atau ada lebih dari satu hasil. Coba gunakan nama kelas yang lebih spesifik."}
+
+    if not kelas_id:
+        cursor.close()
+        db.close()
+        return {"error": "Harus menyertakan kelas_id atau nama_kelas"}
+
+    if not tanggal_mulai or not tanggal_akhir:
+        cursor.close()
+        db.close()
+        return {"error": "Harus menyertakan tanggal_mulai dan tanggal_akhir (format YYYY-MM-DD)"}
+
+    query = """
+        SELECT
+            a.tanggal,
+            COUNT(*) AS total_record,
+            COUNT(CASE WHEN a.status = 'Hadir' THEN 1 END) AS hadir,
+            COUNT(CASE WHEN a.status = 'Izin' THEN 1 END)  AS izin,
+            COUNT(CASE WHEN a.status = 'Sakit' THEN 1 END) AS sakit,
+            COUNT(CASE WHEN a.status = 'Alfa' THEN 1 END)  AS alfa,
+            ROUND(COUNT(CASE WHEN a.status = 'Hadir' THEN 1 END) * 100.0 / COUNT(*), 1) AS persen_hadir
+        FROM absensi a
+        WHERE a.kelas_id = %s
+          AND a.tanggal BETWEEN %s AND %s
+        GROUP BY a.tanggal
+        ORDER BY a.tanggal ASC
+    """
+    cursor.execute(query, [kelas_id, tanggal_mulai, tanggal_akhir])
+    rows = cursor.fetchall()
+
+    cursor.close()
+    db.close()
+    return {
+        "kelas_id": kelas_id,
+        "tanggal_mulai": tanggal_mulai,
+        "tanggal_akhir": tanggal_akhir,
+        "data": rows
+    }
+
+
+def get_rekap_absensi_kelas_range(
+    kelas_id: Optional[int] = None,
+    nama_kelas: Optional[str] = None,
+    tanggal_mulai: str = "",
+    tanggal_akhir: str = ""
+) -> Dict[str, Any]:
+    """
+    Rekap absensi per siswa untuk 1 kelas pada rentang tanggal.
+    Output: list siswa + total Hadir/Izin/Sakit/Alfa + total_record.
+    """
+    db = get_db_connection()
+    cursor = db.cursor(dictionary=True)
+
+    if not kelas_id and nama_kelas:
+        kelas_id = _resolve_kelas_id(cursor, nama_kelas)
+        if not kelas_id:
+            cursor.close()
+            db.close()
+            return {"error": f"Kelas dengan nama '{nama_kelas}' tidak ditemukan atau ada lebih dari satu hasil. Coba gunakan nama kelas yang lebih spesifik."}
+
+    if not kelas_id:
+        cursor.close()
+        db.close()
+        return {"error": "Harus menyertakan kelas_id atau nama_kelas"}
+
+    if not tanggal_mulai or not tanggal_akhir:
+        cursor.close()
+        db.close()
+        return {"error": "Harus menyertakan tanggal_mulai dan tanggal_akhir (format YYYY-MM-DD)"}
+
+    query = """
+        SELECT
+            s.id AS siswa_id,
+            s.nama AS nama_siswa,
+            s.nis,
+            COUNT(*) AS total_record,
+            COUNT(CASE WHEN a.status = 'Hadir' THEN 1 END) AS hadir,
+            COUNT(CASE WHEN a.status = 'Izin' THEN 1 END)  AS izin,
+            COUNT(CASE WHEN a.status = 'Sakit' THEN 1 END) AS sakit,
+            COUNT(CASE WHEN a.status = 'Alfa' THEN 1 END)  AS alfa,
+            ROUND(COUNT(CASE WHEN a.status = 'Hadir' THEN 1 END) * 100.0 / COUNT(*), 1) AS persen_hadir
+        FROM absensi a
+        JOIN siswa s ON a.siswa_id = s.id
+        WHERE a.kelas_id = %s
+          AND a.tanggal BETWEEN %s AND %s
+        GROUP BY s.id, s.nama, s.nis
+        ORDER BY alfa DESC, izin DESC, sakit DESC, s.nama ASC
+    """
+    cursor.execute(query, [kelas_id, tanggal_mulai, tanggal_akhir])
+    rows = cursor.fetchall()
+
+    cursor.close()
+    db.close()
+    return {
+        "kelas_id": kelas_id,
+        "tanggal_mulai": tanggal_mulai,
+        "tanggal_akhir": tanggal_akhir,
+        "data": rows
+    }
+
+
+def get_top_siswa_absensi(
+    kelas_id: Optional[int] = None,
+    nama_kelas: Optional[str] = None,
+    tanggal_mulai: str = "",
+    tanggal_akhir: str = "",
+    status: str = "Alfa",
+    limit: int = 10
+) -> Dict[str, Any]:
+    """
+    Ambil top siswa dengan jumlah status tertentu (default: Alfa) pada rentang tanggal.
+    Cocok untuk 'top offender' atau monitoring kasus.
+    """
+    db = get_db_connection()
+    cursor = db.cursor(dictionary=True)
+
+    if not kelas_id and nama_kelas:
+        kelas_id = _resolve_kelas_id(cursor, nama_kelas)
+        if not kelas_id:
+            cursor.close()
+            db.close()
+            return {"error": f"Kelas dengan nama '{nama_kelas}' tidak ditemukan atau ada lebih dari satu hasil. Coba gunakan nama kelas yang lebih spesifik."}
+
+    if not kelas_id:
+        cursor.close()
+        db.close()
+        return {"error": "Harus menyertakan kelas_id atau nama_kelas"}
+
+    if not tanggal_mulai or not tanggal_akhir:
+        cursor.close()
+        db.close()
+        return {"error": "Harus menyertakan tanggal_mulai dan tanggal_akhir (format YYYY-MM-DD)"}
+
+    query = """
+        SELECT
+            s.id AS siswa_id,
+            s.nama AS nama_siswa,
+            s.nis,
+            COUNT(*) AS total
+        FROM absensi a
+        JOIN siswa s ON a.siswa_id = s.id
+        WHERE a.kelas_id = %s
+          AND a.tanggal BETWEEN %s AND %s
+          AND a.status = %s
+        GROUP BY s.id, s.nama, s.nis
+        HAVING total > 0
+        ORDER BY total DESC, s.nama ASC
+        LIMIT %s
+    """
+    cursor.execute(query, [kelas_id, tanggal_mulai, tanggal_akhir, status, limit])
+    rows = cursor.fetchall()
+
+    cursor.close()
+    db.close()
+    return {
+        "kelas_id": kelas_id,
+        "tanggal_mulai": tanggal_mulai,
+        "tanggal_akhir": tanggal_akhir,
+        "status": status,
+        "limit": limit,
+        "data": rows
+    }
+
+
+def get_analisis_metode_absen(
+    kelas_id: Optional[int] = None,
+    nama_kelas: Optional[str] = None,
+    tanggal_mulai: str = "",
+    tanggal_akhir: str = ""
+) -> Dict[str, Any]:
+    """
+    Analisis metode absen (field: metode) untuk satu kelas pada rentang tanggal.
+    Output: ringkasan per metode + breakdown status per metode.
+    """
+    db = get_db_connection()
+    cursor = db.cursor(dictionary=True)
+
+    if not kelas_id and nama_kelas:
+        kelas_id = _resolve_kelas_id(cursor, nama_kelas)
+        if not kelas_id:
+            cursor.close()
+            db.close()
+            return {"error": f"Kelas dengan nama '{nama_kelas}' tidak ditemukan atau ada lebih dari satu hasil. Coba gunakan nama kelas yang lebih spesifik."}
+
+    if not kelas_id:
+        cursor.close()
+        db.close()
+        return {"error": "Harus menyertakan kelas_id atau nama_kelas"}
+
+    if not tanggal_mulai or not tanggal_akhir:
+        cursor.close()
+        db.close()
+        return {"error": "Harus menyertakan tanggal_mulai dan tanggal_akhir (format YYYY-MM-DD)"}
+
+    query = """
+        SELECT
+            a.metode,
+            COUNT(*) AS total,
+            COUNT(CASE WHEN a.status = 'Hadir' THEN 1 END) AS hadir,
+            COUNT(CASE WHEN a.status = 'Izin' THEN 1 END)  AS izin,
+            COUNT(CASE WHEN a.status = 'Sakit' THEN 1 END) AS sakit,
+            COUNT(CASE WHEN a.status = 'Alfa' THEN 1 END)  AS alfa,
+            ROUND(COUNT(CASE WHEN a.status = 'Hadir' THEN 1 END) * 100.0 / COUNT(*), 1) AS persen_hadir
+        FROM absensi a
+        WHERE a.kelas_id = %s
+          AND a.tanggal BETWEEN %s AND %s
+        GROUP BY a.metode
+        ORDER BY total DESC, a.metode ASC
+    """
+    cursor.execute(query, [kelas_id, tanggal_mulai, tanggal_akhir])
+    rows = cursor.fetchall()
+
+    cursor.close()
+    db.close()
+    return {
+        "kelas_id": kelas_id,
+        "tanggal_mulai": tanggal_mulai,
+        "tanggal_akhir": tanggal_akhir,
+        "data": rows
+    }
+
+
+def get_anomali_absensi(
+    kelas_id: Optional[int] = None,
+    nama_kelas: Optional[str] = None,
+    tanggal_mulai: str = "",
+    tanggal_akhir: str = "",
+    max_jarak_meter: int = 200,
+    min_siswa_sama_koordinat: int = 4,
+    limit: int = 100
+) -> Dict[str, Any]:
+    """
+    Deteksi anomali absensi (khususnya geolokasi & data GPS):
+    1) jarak_meter > max_jarak_meter
+    2) metode != 'manual' tapi latitude/longitude null
+    3) banyak siswa share koordinat yang sama pada tanggal yang sama (indikasi 'titip absen')
+    """
+    db = get_db_connection()
+    cursor = db.cursor(dictionary=True)
+
+    if not kelas_id and nama_kelas:
+        kelas_id = _resolve_kelas_id(cursor, nama_kelas)
+        if not kelas_id:
+            cursor.close()
+            db.close()
+            return {"error": f"Kelas dengan nama '{nama_kelas}' tidak ditemukan atau ada lebih dari satu hasil. Coba gunakan nama kelas yang lebih spesifik."}
+
+    if not kelas_id:
+        cursor.close()
+        db.close()
+        return {"error": "Harus menyertakan kelas_id atau nama_kelas"}
+
+    if not tanggal_mulai or not tanggal_akhir:
+        cursor.close()
+        db.close()
+        return {"error": "Harus menyertakan tanggal_mulai dan tanggal_akhir (format YYYY-MM-DD)"}
+
+    # 1) Jarak terlalu jauh
+    far_query = """
+        SELECT
+            a.id,
+            a.tanggal,
+            s.nama AS nama_siswa,
+            s.nis,
+            a.status,
+            a.metode,
+            a.waktu_absen,
+            a.jarak_meter,
+            a.latitude,
+            a.longitude
+        FROM absensi a
+        JOIN siswa s ON a.siswa_id = s.id
+        WHERE a.kelas_id = %s
+          AND a.tanggal BETWEEN %s AND %s
+          AND a.jarak_meter IS NOT NULL
+          AND a.jarak_meter > %s
+        ORDER BY a.jarak_meter DESC, a.tanggal DESC
+        LIMIT %s
+    """
+    cursor.execute(far_query, [kelas_id, tanggal_mulai, tanggal_akhir, max_jarak_meter, limit])
+    far_distance = cursor.fetchall()
+
+    # 2) Metode non-manual tapi koordinat kosong
+    missing_geo_query = """
+        SELECT
+            a.id,
+            a.tanggal,
+            s.nama AS nama_siswa,
+            s.nis,
+            a.status,
+            a.metode,
+            a.waktu_absen,
+            a.latitude,
+            a.longitude
+        FROM absensi a
+        JOIN siswa s ON a.siswa_id = s.id
+        WHERE a.kelas_id = %s
+          AND a.tanggal BETWEEN %s AND %s
+          AND a.metode <> 'manual'
+          AND (a.latitude IS NULL OR a.longitude IS NULL)
+        ORDER BY a.tanggal DESC, s.nama ASC
+        LIMIT %s
+    """
+    cursor.execute(missing_geo_query, [kelas_id, tanggal_mulai, tanggal_akhir, limit])
+    missing_geolocation = cursor.fetchall()
+
+    # 3) Banyak siswa dengan koordinat identik di tanggal yang sama
+    group_query = """
+        SELECT
+            a.tanggal,
+            a.latitude,
+            a.longitude,
+            COUNT(*) AS jumlah_siswa
+        FROM absensi a
+        WHERE a.kelas_id = %s
+          AND a.tanggal BETWEEN %s AND %s
+          AND a.latitude IS NOT NULL
+          AND a.longitude IS NOT NULL
+        GROUP BY a.tanggal, a.latitude, a.longitude
+        HAVING jumlah_siswa >= %s
+        ORDER BY jumlah_siswa DESC, a.tanggal DESC
+        LIMIT 20
+    """
+    cursor.execute(group_query, [kelas_id, tanggal_mulai, tanggal_akhir, min_siswa_sama_koordinat])
+    groups = cursor.fetchall()
+
+    suspicious_shared_coordinates = []
+    detail_query = """
+        SELECT
+            s.nama AS nama_siswa,
+            s.nis,
+            a.status,
+            a.metode,
+            a.waktu_absen
+        FROM absensi a
+        JOIN siswa s ON a.siswa_id = s.id
+        WHERE a.kelas_id = %s
+          AND a.tanggal = %s
+          AND a.latitude = %s
+          AND a.longitude = %s
+        ORDER BY s.nama ASC
+        LIMIT 15
+    """
+    for g in groups:
+        cursor.execute(detail_query, [kelas_id, g["tanggal"], g["latitude"], g["longitude"]])
+        siswa_list = cursor.fetchall()
+        suspicious_shared_coordinates.append({
+            "tanggal": g["tanggal"],
+            "latitude": g["latitude"],
+            "longitude": g["longitude"],
+            "jumlah_siswa": g["jumlah_siswa"],
+            "sampel_siswa": siswa_list
+        })
+
+    cursor.close()
+    db.close()
+
+    return {
+        "kelas_id": kelas_id,
+        "tanggal_mulai": tanggal_mulai,
+        "tanggal_akhir": tanggal_akhir,
+        "max_jarak_meter": max_jarak_meter,
+        "min_siswa_sama_koordinat": min_siswa_sama_koordinat,
+        "far_distance": far_distance,
+        "missing_geolocation": missing_geolocation,
+        "suspicious_shared_coordinates": suspicious_shared_coordinates
+    }
+
+
+def get_statistik_waktu_absen(
+    kelas_id: Optional[int] = None,
+    nama_kelas: Optional[str] = None,
+    tanggal_mulai: str = "",
+    tanggal_akhir: str = "",
+    jam_telat: str = "07:15:00",
+    limit: int = 10
+) -> Dict[str, Any]:
+    """
+    Statistik waktu_absen untuk 1 kelas pada rentang tanggal:
+    - distribusi per jam
+    - total telat (waktu_absen > jam_telat) khusus status Hadir
+    - top siswa telat
+    """
+    db = get_db_connection()
+    cursor = db.cursor(dictionary=True)
+
+    if not kelas_id and nama_kelas:
+        kelas_id = _resolve_kelas_id(cursor, nama_kelas)
+        if not kelas_id:
+            cursor.close()
+            db.close()
+            return {"error": f"Kelas dengan nama '{nama_kelas}' tidak ditemukan atau ada lebih dari satu hasil. Coba gunakan nama kelas yang lebih spesifik."}
+
+    if not kelas_id:
+        cursor.close()
+        db.close()
+        return {"error": "Harus menyertakan kelas_id atau nama_kelas"}
+
+    if not tanggal_mulai or not tanggal_akhir:
+        cursor.close()
+        db.close()
+        return {"error": "Harus menyertakan tanggal_mulai dan tanggal_akhir (format YYYY-MM-DD)"}
+
+    # Distribusi per jam
+    dist_query = """
+        SELECT
+            HOUR(a.waktu_absen) AS jam,
+            COUNT(*) AS total
+        FROM absensi a
+        WHERE a.kelas_id = %s
+          AND a.tanggal BETWEEN %s AND %s
+          AND a.waktu_absen IS NOT NULL
+        GROUP BY HOUR(a.waktu_absen)
+        ORDER BY jam ASC
+    """
+    cursor.execute(dist_query, [kelas_id, tanggal_mulai, tanggal_akhir])
+    distribusi_per_jam = cursor.fetchall()
+
+    # Total telat (khusus Hadir)
+    telat_query = """
+        SELECT
+            COUNT(*) AS total_telat
+        FROM absensi a
+        WHERE a.kelas_id = %s
+          AND a.tanggal BETWEEN %s AND %s
+          AND a.status = 'Hadir'
+          AND a.waktu_absen IS NOT NULL
+          AND a.waktu_absen > %s
+    """
+    cursor.execute(telat_query, [kelas_id, tanggal_mulai, tanggal_akhir, jam_telat])
+    total_telat_row = cursor.fetchone() or {"total_telat": 0}
+
+    # Top siswa telat
+    top_telat_query = """
+        SELECT
+            s.id AS siswa_id,
+            s.nama AS nama_siswa,
+            s.nis,
+            COUNT(*) AS total_telat,
+            MAX(a.waktu_absen) AS telat_terparah
+        FROM absensi a
+        JOIN siswa s ON a.siswa_id = s.id
+        WHERE a.kelas_id = %s
+          AND a.tanggal BETWEEN %s AND %s
+          AND a.status = 'Hadir'
+          AND a.waktu_absen IS NOT NULL
+          AND a.waktu_absen > %s
+        GROUP BY s.id, s.nama, s.nis
+        ORDER BY total_telat DESC, telat_terparah DESC
+        LIMIT %s
+    """
+    cursor.execute(top_telat_query, [kelas_id, tanggal_mulai, tanggal_akhir, jam_telat, limit])
+    top_telat = cursor.fetchall()
+
+    cursor.close()
+    db.close()
+
+    return {
+        "kelas_id": kelas_id,
+        "tanggal_mulai": tanggal_mulai,
+        "tanggal_akhir": tanggal_akhir,
+        "jam_telat": jam_telat,
+        "distribusi_per_jam": distribusi_per_jam,
+        "total_telat": total_telat_row["total_telat"],
+        "top_telat": top_telat
+    }

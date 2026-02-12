@@ -283,7 +283,7 @@ tools = [
                     },
                     "nama_kelas": {
                         "type": "string",
-                        "description": "Nama kelas, misal 'X RPL 1', 'XI TKJ 2' (opsional jika kelas_id diisi)"
+                        "description": "Nama kelas, misal 'X RPL', 'XI TSM' (opsional jika kelas_id diisi)"
                     },
                     "tanggal": {
                         "type": "string",
@@ -310,6 +310,132 @@ tools = [
                         "description": "Department (RPL, TKJ, etc.) (opsional)"
                     }
                 }
+            }
+        }
+    }
+
+    ,
+    {
+        "type": "function",
+        "function": {
+            "name": "get_ringkasan_absensi_harian",
+            "description": "Ringkasan absensi 1 kelas pada 1 tanggal: total Hadir/Izin/Sakit/Alfa + persentase hadir.",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "kelas_id": {"type": "integer", "description": "ID kelas (opsional jika nama_kelas diisi)"},
+                    "nama_kelas": {"type": "string", "description": "Nama kelas (opsional jika kelas_id diisi)"},
+                    "tanggal": {"type": "string", "description": "Tanggal absensi (YYYY-MM-DD). Default: hari ini"}
+                }
+            }
+        }
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "get_ringkasan_absensi_range",
+            "description": "Ringkasan absensi per hari untuk 1 kelas pada rentang tanggal (untuk grafik/tren).",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "kelas_id": {"type": "integer", "description": "ID kelas (opsional jika nama_kelas diisi)"},
+                    "nama_kelas": {"type": "string", "description": "Nama kelas (opsional jika kelas_id diisi)"},
+                    "tanggal_mulai": {"type": "string", "description": "Tanggal mulai (YYYY-MM-DD)"},
+                    "tanggal_akhir": {"type": "string", "description": "Tanggal akhir (YYYY-MM-DD)"}
+                },
+                "required": ["tanggal_mulai", "tanggal_akhir"]
+            }
+        }
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "get_rekap_absensi_kelas_range",
+            "description": "Rekap absensi per siswa untuk 1 kelas pada rentang tanggal (Hadir/Izin/Sakit/Alfa + persen hadir).",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "kelas_id": {"type": "integer", "description": "ID kelas (opsional jika nama_kelas diisi)"},
+                    "nama_kelas": {"type": "string", "description": "Nama kelas (opsional jika kelas_id diisi)"},
+                    "tanggal_mulai": {"type": "string", "description": "Tanggal mulai (YYYY-MM-DD)"},
+                    "tanggal_akhir": {"type": "string", "description": "Tanggal akhir (YYYY-MM-DD)"}
+                },
+                "required": ["tanggal_mulai", "tanggal_akhir"]
+            }
+        }
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "get_top_siswa_absensi",
+            "description": "Ambil top siswa dengan jumlah status tertentu (default: Alfa) pada rentang tanggal.",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "kelas_id": {"type": "integer", "description": "ID kelas (opsional jika nama_kelas diisi)"},
+                    "nama_kelas": {"type": "string", "description": "Nama kelas (opsional jika kelas_id diisi)"},
+                    "tanggal_mulai": {"type": "string", "description": "Tanggal mulai (YYYY-MM-DD)"},
+                    "tanggal_akhir": {"type": "string", "description": "Tanggal akhir (YYYY-MM-DD)"},
+                    "status": {"type": "string", "description": "Status yang dihitung: Hadir/Izin/Sakit/Alfa. Default: Alfa"},
+                    "limit": {"type": "integer", "description": "Jumlah maksimal baris. Default: 10"}
+                },
+                "required": ["tanggal_mulai", "tanggal_akhir"]
+            }
+        }
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "get_analisis_metode_absen",
+            "description": "Analisis metode absen (field: metode) untuk 1 kelas pada rentang tanggal, termasuk breakdown status.",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "kelas_id": {"type": "integer", "description": "ID kelas (opsional jika nama_kelas diisi)"},
+                    "nama_kelas": {"type": "string", "description": "Nama kelas (opsional jika kelas_id diisi)"},
+                    "tanggal_mulai": {"type": "string", "description": "Tanggal mulai (YYYY-MM-DD)"},
+                    "tanggal_akhir": {"type": "string", "description": "Tanggal akhir (YYYY-MM-DD)"}
+                },
+                "required": ["tanggal_mulai", "tanggal_akhir"]
+            }
+        }
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "get_anomali_absensi",
+            "description": "Deteksi anomali absensi: jarak terlalu jauh, metode non-manual tapi koordinat kosong, dan banyak siswa share koordinat identik.",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "kelas_id": {"type": "integer", "description": "ID kelas (opsional jika nama_kelas diisi)"},
+                    "nama_kelas": {"type": "string", "description": "Nama kelas (opsional jika kelas_id diisi)"},
+                    "tanggal_mulai": {"type": "string", "description": "Tanggal mulai (YYYY-MM-DD)"},
+                    "tanggal_akhir": {"type": "string", "description": "Tanggal akhir (YYYY-MM-DD)"},
+                    "max_jarak_meter": {"type": "integer", "description": "Batas jarak_meter untuk dianggap anomali. Default: 200"},
+                    "min_siswa_sama_koordinat": {"type": "integer", "description": "Minimal jumlah siswa dengan koordinat identik (per tanggal) untuk di-flag. Default: 4"},
+                    "limit": {"type": "integer", "description": "Limit hasil per kategori anomali. Default: 100"}
+                },
+                "required": ["tanggal_mulai", "tanggal_akhir"]
+            }
+        }
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "get_statistik_waktu_absen",
+            "description": "Statistik waktu_absen: distribusi per jam, total telat (waktu_absen > jam_telat), dan top siswa telat.",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "kelas_id": {"type": "integer", "description": "ID kelas (opsional jika nama_kelas diisi)"},
+                    "nama_kelas": {"type": "string", "description": "Nama kelas (opsional jika kelas_id diisi)"},
+                    "tanggal_mulai": {"type": "string", "description": "Tanggal mulai (YYYY-MM-DD)"},
+                    "tanggal_akhir": {"type": "string", "description": "Tanggal akhir (YYYY-MM-DD)"},
+                    "jam_telat": {"type": "string", "description": "Ambang telat (HH:MM:SS). Default: 07:15:00"},
+                    "limit": {"type": "integer", "description": "Limit top siswa telat. Default: 10"}
+                },
+                "required": ["tanggal_mulai", "tanggal_akhir"]
             }
         }
     }

@@ -19,6 +19,9 @@ def main():
         "Berapa persentase kehadiran kelas ID 3?",
         "Siapa saja yang alfa hari ini?",
         "Tampilkan absensi siswa ID 10 dari tanggal 2026-02-01 sampai 2026-02-09",
+        "Analisis metode absen kelas 10A bulan ini",
+        "Siapa top 5 siswa paling rajin absen di kelas 11B?",
+        "Cek anomali absensi di kelas 12C",
     ]
 
     print("📋 Contoh pertanyaan yang bisa ditanyakan:")
