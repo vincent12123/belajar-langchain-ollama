@@ -58,11 +58,24 @@ available_functions = {
 
 def run_agent(user_message: str, model: str = None) -> str:
     """
+    Jalankan agent untuk menjawab pertanyaan user (tanpa history).
+    Untuk mode dengan history, gunakan run_agent_with_history().
+    """
+    return run_agent_with_history(user_message, chat_history=None, model=model)
+
+
+def run_agent_with_history(user_message: str, chat_history: list = None, model: str = None) -> str:
+    """
     Jalankan agent untuk menjawab pertanyaan user.
+    
+    Args:
+        user_message: Pesan terakhir dari user
+        chat_history: Riwayat percakapan sebelumnya [{"role": ..., "content": ...}]
+        model: Model Ollama yang digunakan
     
     Flow:
     1. User bertanya dalam bahasa natural
-    2. LLM menganalisis dan memilih tool yang tepat
+    2. LLM menganalisis dan memilih tool yang tepat (dengan konteks history)
     3. Tool dieksekusi → query ke MySQL
     4. Hasil dikirim balik ke LLM
     5. LLM merangkum jawaban dalam bahasa natural
@@ -72,14 +85,25 @@ def run_agent(user_message: str, model: str = None) -> str:
     if model is None:
         model = OLLAMA_MODEL
     
-    messages = [
-        {"role": "system", "content": SYSTEM_PROMPT},
-        {"role": "user", "content": user_message}
-    ]
+    messages = [{"role": "system", "content": SYSTEM_PROMPT}]
+
+    # Tambahkan riwayat percakapan sebelumnya (maks 20 pesan terakhir)
+    if chat_history:
+        # Batasi history agar tidak terlalu panjang
+        recent_history = chat_history[-20:]
+        for msg in recent_history:
+            role = msg.get("role", "")
+            content = msg.get("content", "")
+            if role in ("user", "assistant") and content:
+                messages.append({"role": role, "content": content})
+
+    # Tambahkan pesan user terbaru
+    messages.append({"role": "user", "content": user_message})
 
     print(f"\n{'='*60}")
     print(f"👤 User: {user_message}")
     print(f"🤖 Model: {model}")
+    print(f"📜 History: {len(messages) - 2} pesan sebelumnya")
     print(f"{'='*60}")
 
     # ── Step 1: Kirim ke Ollama dengan tools ──

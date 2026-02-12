@@ -74,7 +74,7 @@ class TopSiswaRequest(BaseModel):
 
 # Import your existing functions
 try:
-    from agent import run_agent
+    from agent import run_agent, run_agent_with_history
     from db_functions import (
         get_attendance_trends,
         get_geolocation_analysis,
@@ -123,11 +123,34 @@ async def chat_ai_sdk(request: Request):
         if not last_message:
             raise HTTPException(status_code=400, detail="No user message found")
 
-        logger.info(f"AI SDK chat request: {last_message[:100]}...")
+        # Build chat history from previous messages (exclude the last user message)
+        chat_history = []
+        for msg in messages:
+            role = msg.get("role", "")
+            if role not in ("user", "assistant"):
+                continue
+            # Extract text content
+            content = ""
+            parts = msg.get("parts", [])
+            if parts:
+                text_parts = [p.get("text", "") for p in parts if p.get("type") == "text"]
+                content = " ".join(filter(None, text_parts))
+            if not content:
+                content = msg.get("content", "")
+            if content:
+                chat_history.append({"role": role, "content": content})
+        
+        # Remove the last user message from history (it will be passed separately)
+        if chat_history and chat_history[-1]["role"] == "user":
+            chat_history = chat_history[:-1]
 
-        # Run agent in thread pool to avoid blocking
+        logger.info(f"AI SDK chat request: {last_message[:100]}... (history: {len(chat_history)} msgs)")
+
+        # Run agent with history in thread pool to avoid blocking
         loop = asyncio.get_event_loop()
-        result = await loop.run_in_executor(None, run_agent, last_message)
+        result = await loop.run_in_executor(
+            None, run_agent_with_history, last_message, chat_history
+        )
 
         # Return as plain text stream (for TextStreamChatTransport)
         async def generate():

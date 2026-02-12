@@ -99,18 +99,56 @@ const DateSuggestion = ({ messages, onSelectDate }) => {
     return { shouldShow: true, isRange: hasRange };
   }, [messages]);
 
+  /** Extract the last user question to build contextual follow-up */
+  const lastUserQuestion = useMemo(() => {
+    if (!messages || messages.length === 0) return '';
+    for (let i = messages.length - 1; i >= 0; i--) {
+      if (messages[i].role !== 'user') continue;
+      let text = '';
+      if (typeof messages[i].content === 'string') {
+        text = messages[i].content;
+      } else if (messages[i].parts) {
+        text = messages[i].parts
+          .filter((p) => p.type === 'text')
+          .map((p) => p.text)
+          .join(' ');
+      }
+      if (text) return text.trim();
+    }
+    return '';
+  }, [messages]);
+
+  /**
+   * Build a contextual message that references the previous conversation.
+   * If we know what the user asked before, repeat it with the date.
+   * Otherwise, send a generic but neutral date reference.
+   */
+  const buildContextMessage = useCallback((dateStr) => {
+    if (lastUserQuestion) {
+      return `${lastUserQuestion} pada tanggal ${dateStr}`;
+    }
+    return `Tampilkan data absensi pada tanggal ${dateStr}`;
+  }, [lastUserQuestion]);
+
+  const buildContextRangeMessage = useCallback((startStr, endStr) => {
+    if (lastUserQuestion) {
+      return `${lastUserQuestion} dari tanggal ${startStr} sampai ${endStr}`;
+    }
+    return `Tampilkan data absensi dari tanggal ${startStr} sampai ${endStr}`;
+  }, [lastUserQuestion]);
+
   const handleQuickDate = useCallback(
     (label, dateStr) => {
-      onSelectDate(label, dateStr);
+      onSelectDate(label, buildContextMessage(dateStr));
     },
-    [onSelectDate]
+    [onSelectDate, buildContextMessage]
   );
 
   const handleQuickRange = useCallback(
     (label, startStr, endStr) => {
-      onSelectDate(label, `dari tanggal ${startStr} sampai ${endStr}`);
+      onSelectDate(label, buildContextRangeMessage(startStr, endStr));
     },
-    [onSelectDate]
+    [onSelectDate, buildContextRangeMessage]
   );
 
   const handleCustomSubmit = useCallback(() => {
@@ -120,16 +158,16 @@ const DateSuggestion = ({ messages, onSelectDate }) => {
       const e = new Date(customEnd);
       onSelectDate(
         `${fmtReadable(s)} - ${fmtReadable(e)}`,
-        `dari tanggal ${customStart} sampai ${customEnd}`
+        buildContextRangeMessage(customStart, customEnd)
       );
     } else {
       const d = new Date(customStart);
-      onSelectDate(fmtReadable(d), customStart);
+      onSelectDate(fmtReadable(d), buildContextMessage(customStart));
     }
     setShowCustom(false);
     setCustomStart('');
     setCustomEnd('');
-  }, [customStart, customEnd, isRange, onSelectDate]);
+  }, [customStart, customEnd, isRange, onSelectDate, buildContextMessage, buildContextRangeMessage]);
 
   if (!shouldShow) return null;
 
