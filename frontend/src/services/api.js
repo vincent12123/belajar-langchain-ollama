@@ -74,3 +74,41 @@ export const getStudentAttendance = async (studentId, startDate = null, endDate 
 };
 
 export default api;
+
+// Download PDF file from server
+export const downloadFile = async (filename) => {
+  const encodedName = encodeURIComponent(filename);
+  const url = `${API_BASE_URL}/download/${encodedName}`;
+  
+  try {
+    const response = await api.get(`/download/${encodedName}`, {
+      responseType: 'blob',
+    });
+    
+    // Create download link
+    const blob = new Blob([response.data], { type: 'application/pdf' });
+    const downloadUrl = window.URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = downloadUrl;
+    link.download = filename;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    window.URL.revokeObjectURL(downloadUrl);
+    return true;
+  } catch (error) {
+    // Fallback: open in new tab
+    window.open(url, '_blank');
+    return false;
+  }
+};
+
+// List available files
+export const listFiles = async () => {
+  try {
+    const response = await api.get('/files');
+    return response.data;
+  } catch (error) {
+    throw new Error(error.response?.data?.detail || 'Failed to list files');
+  }
+};

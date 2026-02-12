@@ -1,6 +1,6 @@
-from fastapi import FastAPI, HTTPException, WebSocket, WebSocketDisconnect
+from fastapi import FastAPI, HTTPException, Request, WebSocket, WebSocketDisconnect
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import FileResponse
+from fastapi.responses import FileResponse, StreamingResponse
 from pydantic import BaseModel
 from typing import Optional
 import asyncio
@@ -24,6 +24,7 @@ app.add_middleware(
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
+    expose_headers=["X-Vercel-AI-Data-Stream"],
 )
 
 # Models
@@ -90,6 +91,57 @@ except ImportError as e:
 @app.get("/")
 def read_root():
     return {"status": "online", "message": "Server Absensi AI siap. Gunakan endpoint /chat untuk bertanya."}
+
+
+@app.post("/api/chat")
+async def chat_ai_sdk(request: Request):
+    """
+    Endpoint compatible with Vercel AI SDK useChat hook.
+    Receives messages in AI SDK format, returns plain text stream.
+    """
+    if not BACKEND_READY:
+        raise HTTPException(status_code=503, detail="Backend services not available")
+
+    try:
+        data = await request.json()
+        messages = data.get("messages", [])
+
+        # Extract last user message (support both AI SDK v4 and v5 formats)
+        last_message = ""
+        for msg in reversed(messages):
+            if msg.get("role") == "user":
+                # AI SDK v5+ uses 'parts' format
+                parts = msg.get("parts", [])
+                if parts:
+                    text_parts = [p.get("text", "") for p in parts if p.get("type") == "text"]
+                    last_message = " ".join(filter(None, text_parts))
+                # AI SDK v4 or fallback to 'content'
+                if not last_message:
+                    last_message = msg.get("content", "")
+                break
+
+        if not last_message:
+            raise HTTPException(status_code=400, detail="No user message found")
+
+        logger.info(f"AI SDK chat request: {last_message[:100]}...")
+
+        # Run agent in thread pool to avoid blocking
+        loop = asyncio.get_event_loop()
+        result = await loop.run_in_executor(None, run_agent, last_message)
+
+        # Return as plain text stream (for TextStreamChatTransport)
+        async def generate():
+            yield result
+
+        return StreamingResponse(
+            generate(),
+            media_type="text/plain",
+        )
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"AI SDK chat error: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
 
 @app.post("/chat", response_model=QueryResponse)
 def chat_endpoint(request: QueryRequest):
