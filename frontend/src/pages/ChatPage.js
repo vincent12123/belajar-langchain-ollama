@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import { useChat } from '@ai-sdk/react';
 import { TextStreamChatTransport } from 'ai';
 import {
@@ -10,6 +10,7 @@ import '@llamaindex/chat-ui/styles/markdown.css';
 import '../custom-styles.css';
 import PdfDownloadDetector from '../components/PdfDownloadDetector';
 import DateSuggestion from '../components/DateSuggestion';
+import ChatLoadingIndicator from '../components/ChatLoadingIndicator';
 
 const SUGGESTED_QUESTIONS = [
   { label: "Absen Hari Ini", text: "Siapa saja yang tidak hadir hari ini?" },
@@ -22,6 +23,7 @@ const SUGGESTED_QUESTIONS = [
 
 const ChatPage = () => {
   const [chatKey, setChatKey] = useState(0);
+  const messagesEndRef = useRef(null);
 
   const handler = useChat({
     chatId: `chat-${chatKey}`,
@@ -29,6 +31,13 @@ const ChatPage = () => {
       api: 'http://localhost:8000/api/chat',
     }),
   });
+
+  // Auto-scroll ke bawah saat ada pesan baru atau streaming
+  useEffect(() => {
+    if (messagesEndRef.current) {
+      messagesEndRef.current.scrollIntoView({ behavior: 'smooth' });
+    }
+  }, [handler.messages, handler.isLoading]);
 
   const handleNewChat = () => {
     setChatKey(prev => prev + 1);
@@ -144,7 +153,11 @@ const ChatPage = () => {
                   </div>
                 </div>
               ) : (
-                <ChatMessages />
+                <>
+                  <ChatMessages />
+                  <ChatLoadingIndicator isLoading={handler.isLoading} />
+                  <div ref={messagesEndRef} />
+                </>
               )}
             </div>
             <PdfDownloadDetector messages={handler.messages} />
