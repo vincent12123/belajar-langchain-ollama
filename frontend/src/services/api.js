@@ -7,7 +7,26 @@ const api = axios.create({
   headers: {
     'Content-Type': 'application/json',
   },
+  timeout: 10000,
 });
+
+// Health Check API
+export const checkApiHealth = async () => {
+  try {
+    const response = await api.get('/', { timeout: 5000 });
+    return { 
+      online: true, 
+      message: response.data?.message || 'Connected',
+      status: response.status 
+    };
+  } catch (error) {
+    return { 
+      online: false, 
+      message: error.message || 'Server tidak dapat dihubungi',
+      status: null 
+    };
+  }
+};
 
 // Chat API
 export const chatWithAI = async (message, model = null) => {

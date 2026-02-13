@@ -6,6 +6,7 @@ import ChatPage from './pages/ChatPage';
 import AttendanceTrendsPage from './pages/AttendanceTrendsPage';
 import GeolocationAnalysisPage from './pages/GeolocationAnalysisPage';
 import ClassComparisonPage from './pages/ClassComparisonPage';
+import ConnectionStatus from './components/ConnectionStatus';
 
 const NAV_ITEMS = [
   { path: '/', label: 'Home', icon: 'home' },
@@ -28,7 +29,7 @@ function NavBar() {
           EduAttend<span className="text-primary">AI</span>
         </span>
       </Link>
-      <div className="flex items-center gap-1">
+      <div className="flex items-center gap-1 flex-1">
         {NAV_ITEMS.map((item) => {
           const isActive = location.pathname === item.path;
           return (
@@ -46,6 +47,9 @@ function NavBar() {
             </Link>
           );
         })}
+      </div>
+      <div className="ml-auto">
+        <ConnectionStatus />
       </div>
     </nav>
   );
