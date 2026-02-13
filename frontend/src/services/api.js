@@ -132,6 +132,36 @@ export const getStudentAttendance = async (studentId, startDate = null, endDate 
   }
 };
 
+// Daftar Kelas API
+export const getKelasList = async () => {
+  try {
+    const response = await api.get('/api/kelas');
+    return response.data;
+  } catch (error) {
+    throw new Error(error.response?.data?.detail || 'Failed to get kelas list');
+  }
+};
+
+// Laporan Kepsek Range API
+export const getLaporanKepsek = async (params) => {
+  try {
+    const response = await api.post('/api/laporan/kepsek', params);
+    return response.data;
+  } catch (error) {
+    throw new Error(error.response?.data?.detail || 'Failed to get laporan kepsek');
+  }
+};
+
+// Laporan Guru Harian API
+export const getLaporanGuruHarian = async (params) => {
+  try {
+    const response = await api.post('/api/laporan/guru-harian', params);
+    return response.data;
+  } catch (error) {
+    throw new Error(error.response?.data?.detail || 'Failed to get laporan guru harian');
+  }
+};
+
 export default api;
 
 // Download PDF file from server

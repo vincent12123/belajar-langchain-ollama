@@ -80,6 +80,18 @@ class StatistikWaktuRequest(BaseModel):
     jam_telat: Optional[str] = "07:15:00"
     limit: Optional[int] = 10
 
+class LaporanKepsekRequest(BaseModel):
+    tanggal_mulai: str
+    tanggal_akhir: str
+    tingkat: Optional[int] = None
+    jurusan: Optional[str] = None
+    threshold_kehadiran: Optional[float] = 85.0
+
+class LaporanGuruHarianRequest(BaseModel):
+    kelas_id: Optional[int] = None
+    nama_kelas: Optional[str] = None
+    tanggal: Optional[str] = None
+
 # Import your existing functions
 try:
     from agent import run_agent, run_agent_with_history
@@ -93,6 +105,9 @@ try:
         get_analisis_metode_absen,
         get_top_siswa_absensi,
         get_statistik_waktu_absen,
+        get_laporan_kepsek_range,
+        get_laporan_guru_harian,
+        get_daftar_kelas,
     )
     BACKEND_READY = True
 except ImportError as e:
@@ -379,6 +394,48 @@ async def get_statistik_waktu_api(request: StatistikWaktuRequest):
         logger.error(f"Statistik waktu error: {e}")
         raise HTTPException(status_code=500, detail=str(e))
 
+@app.post("/api/laporan/kepsek")
+async def get_laporan_kepsek_api(request: LaporanKepsekRequest):
+    """Laporan ringkasan range lintas kelas untuk kepala sekolah"""
+    if not BACKEND_READY:
+        raise HTTPException(status_code=503, detail="Backend services not available")
+
+    try:
+        loop = asyncio.get_event_loop()
+        result = await loop.run_in_executor(
+            None,
+            get_laporan_kepsek_range,
+            request.tanggal_mulai,
+            request.tanggal_akhir,
+            request.tingkat,
+            request.jurusan,
+            request.threshold_kehadiran
+        )
+        return result
+    except Exception as e:
+        logger.error(f"Laporan kepsek error: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.post("/api/laporan/guru-harian")
+async def get_laporan_guru_harian_api(request: LaporanGuruHarianRequest):
+    """Laporan absensi harian detail per kelas untuk guru/wali kelas"""
+    if not BACKEND_READY:
+        raise HTTPException(status_code=503, detail="Backend services not available")
+
+    try:
+        loop = asyncio.get_event_loop()
+        result = await loop.run_in_executor(
+            None,
+            get_laporan_guru_harian,
+            request.kelas_id,
+            request.nama_kelas,
+            request.tanggal
+        )
+        return result
+    except Exception as e:
+        logger.error(f"Laporan guru harian error: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
 @app.websocket("/ws/{client_id}")
 async def websocket_endpoint(websocket: WebSocket, client_id: str):
     await websocket.accept()
@@ -404,6 +461,22 @@ async def websocket_endpoint(websocket: WebSocket, client_id: str):
             await websocket.send_text(f"Error: {str(e)}")
         except:
             pass
+
+
+# ── Lookup endpoints ──
+
+@app.get("/api/kelas")
+async def get_kelas_list_api():
+    """Get list of all active classes"""
+    if not BACKEND_READY:
+        raise HTTPException(status_code=503, detail="Backend services not available")
+    try:
+        loop = asyncio.get_event_loop()
+        result = await loop.run_in_executor(None, get_daftar_kelas)
+        return result
+    except Exception as e:
+        logger.error(f"Kelas list error: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
 
 
 # ── File download endpoint for generated PDFs ──

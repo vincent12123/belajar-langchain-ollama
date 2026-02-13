@@ -36,6 +36,22 @@ def _resolve_kelas_id(cursor, nama_kelas: str) -> Optional[int]:
     return None
 
 
+def get_daftar_kelas() -> List[Dict[str, Any]]:
+    """Ambil daftar semua kelas aktif (id, nama, tingkat, jurusan, wali_kelas)"""
+    db = get_db_connection()
+    cursor = db.cursor(dictionary=True)
+    cursor.execute("""
+        SELECT k.id, k.nama, k.tingkat, k.jurusan, k.wali_kelas
+        FROM kelas k
+        WHERE k.deleted_at IS NULL
+        ORDER BY k.tingkat ASC, k.nama ASC
+    """)
+    result = cursor.fetchall()
+    cursor.close()
+    db.close()
+    return result
+
+
 def cari_siswa(nama: str) -> List[Dict[str, Any]]:
     """Cari siswa berdasarkan nama (pencarian parsial)"""
     db = get_db_connection()
@@ -1356,4 +1372,265 @@ def get_statistik_waktu_absen(
         "distribusi_per_jam": distribusi_per_jam,
         "total_telat": total_telat_row["total_telat"],
         "top_telat": top_telat
+    }
+
+
+# ==========================
+# Laporan Structured: Kepsek & Guru
+# ==========================
+
+def get_laporan_kepsek_range(
+    tanggal_mulai: str = "",
+    tanggal_akhir: str = "",
+    tingkat: Optional[int] = None,
+    jurusan: Optional[str] = None,
+    threshold_kehadiran: float = 85.0
+) -> Dict[str, Any]:
+    """
+    Laporan ringkasan range untuk kepala sekolah: lintas kelas, ranking,
+    alerts otomatis (LOW_ATTENDANCE_CLASS, HIGH_ALFA_CLASS).
+    Output sesuai format structured 'kepsek_ringkasan_range'.
+    """
+    from datetime import datetime
+
+    if not tanggal_mulai or not tanggal_akhir:
+        return {"error": "Harus menyertakan tanggal_mulai dan tanggal_akhir (format YYYY-MM-DD)"}
+
+    db = get_db_connection()
+    cursor = db.cursor(dictionary=True)
+
+    # ── 1) Ranking per kelas ──
+    ranking_query = """
+        SELECT
+            k.id   AS kelas_id,
+            k.nama AS kelas,
+            COUNT(*) AS total_record,
+            COUNT(CASE WHEN a.status = 'Hadir' THEN 1 END) AS hadir,
+            COUNT(CASE WHEN a.status = 'Izin'  THEN 1 END) AS izin,
+            COUNT(CASE WHEN a.status = 'Sakit' THEN 1 END) AS sakit,
+            COUNT(CASE WHEN a.status = 'Alfa'  THEN 1 END) AS alfa,
+            ROUND(COUNT(CASE WHEN a.status = 'Hadir' THEN 1 END) * 100.0 / COUNT(*), 2) AS persen_hadir
+        FROM absensi a
+        JOIN kelas k ON a.kelas_id = k.id
+        WHERE a.tanggal BETWEEN %s AND %s
+    """
+    params: list = [tanggal_mulai, tanggal_akhir]
+
+    if tingkat:
+        ranking_query += " AND k.tingkat = %s"
+        params.append(tingkat)
+    if jurusan:
+        ranking_query += " AND k.jurusan = %s"
+        params.append(jurusan)
+
+    ranking_query += """
+        GROUP BY k.id, k.nama
+        HAVING total_record > 0
+        ORDER BY persen_hadir DESC
+    """
+    cursor.execute(ranking_query, params)
+    ranking_kelas = cursor.fetchall()
+
+    # ── 2) Summary aggregat ──
+    total_kelas = len(ranking_kelas)
+    total_record = sum(r["total_record"] for r in ranking_kelas)
+    total_hadir = sum(r["hadir"] for r in ranking_kelas)
+    total_izin  = sum(r["izin"]  for r in ranking_kelas)
+    total_sakit = sum(r["sakit"] for r in ranking_kelas)
+    total_alfa  = sum(r["alfa"]  for r in ranking_kelas)
+    rata_rata   = round(total_hadir * 100.0 / total_record, 2) if total_record else 0
+
+    # Jumlah hari unik yang ter-record
+    cursor.execute(
+        "SELECT COUNT(DISTINCT tanggal) AS hari FROM absensi WHERE tanggal BETWEEN %s AND %s",
+        [tanggal_mulai, tanggal_akhir]
+    )
+    hari_row = cursor.fetchone()
+    total_hari_tercatat = hari_row["hari"] if hari_row else 0
+
+    # Jumlah siswa unik
+    siswa_params: list = [tanggal_mulai, tanggal_akhir]
+    siswa_query = "SELECT COUNT(DISTINCT siswa_id) AS jml FROM absensi a JOIN kelas k ON a.kelas_id = k.id WHERE a.tanggal BETWEEN %s AND %s"
+    if tingkat:
+        siswa_query += " AND k.tingkat = %s"
+        siswa_params.append(tingkat)
+    if jurusan:
+        siswa_query += " AND k.jurusan = %s"
+        siswa_params.append(jurusan)
+    cursor.execute(siswa_query, siswa_params)
+    siswa_row = cursor.fetchone()
+    total_siswa = siswa_row["jml"] if siswa_row else 0
+
+    # ── 3) Alerts otomatis ──
+    alerts = []
+    for r in ranking_kelas:
+        if r["persen_hadir"] < threshold_kehadiran:
+            alerts.append({
+                "type": "LOW_ATTENDANCE_CLASS",
+                "message": f"Kehadiran kelas {r['kelas']} di bawah {threshold_kehadiran}% pada periode ini ({r['persen_hadir']}%).",
+                "kelas_id": r["kelas_id"],
+                "kelas": r["kelas"],
+                "value": float(r["persen_hadir"])
+            })
+        if r["alfa"] >= 10:
+            alerts.append({
+                "type": "HIGH_ALFA_CLASS",
+                "message": f"Alfa tinggi pada kelas {r['kelas']} ({r['alfa']} kejadian).",
+                "kelas_id": r["kelas_id"],
+                "kelas": r["kelas"],
+                "value": int(r["alfa"])
+            })
+
+    cursor.close()
+    db.close()
+
+    return {
+        "report_type": "kepsek_ringkasan_range",
+        "scope": {
+            "tanggal_mulai": tanggal_mulai,
+            "tanggal_akhir": tanggal_akhir,
+            "filter_tingkat": tingkat,
+            "filter_jurusan": jurusan,
+            "include_weekends": True
+        },
+        "summary": {
+            "total_kelas": total_kelas,
+            "total_siswa": total_siswa,
+            "total_hari_tercatat": total_hari_tercatat,
+            "breakdown_total": {
+                "Hadir": total_hadir,
+                "Izin": total_izin,
+                "Sakit": total_sakit,
+                "Alfa": total_alfa
+            },
+            "rata_rata_persen_hadir": rata_rata
+        },
+        "ranking_kelas": ranking_kelas,
+        "alerts": alerts,
+        "generated_at": datetime.now().isoformat()
+    }
+
+
+def get_laporan_guru_harian(
+    kelas_id: Optional[int] = None,
+    nama_kelas: Optional[str] = None,
+    tanggal: Optional[str] = None
+) -> Dict[str, Any]:
+    """
+    Laporan absensi harian detail untuk guru/wali kelas:
+    daftar setiap siswa beserta status, metode, waktu_absen, dan
+    deteksi siswa yang belum punya record absensi di tanggal tersebut.
+    Output sesuai format structured 'guru_absensi_harian_detail'.
+    """
+    from datetime import datetime
+
+    db = get_db_connection()
+    cursor = db.cursor(dictionary=True)
+
+    # Resolve kelas
+    if not kelas_id and nama_kelas:
+        kelas_id = _resolve_kelas_id(cursor, nama_kelas)
+        if not kelas_id:
+            cursor.close()
+            db.close()
+            return {"error": f"Kelas dengan nama '{nama_kelas}' tidak ditemukan atau ada lebih dari satu hasil. Coba gunakan nama kelas yang lebih spesifik."}
+
+    if not kelas_id:
+        cursor.close()
+        db.close()
+        return {"error": "Harus menyertakan kelas_id atau nama_kelas"}
+
+    if not tanggal:
+        tanggal = date.today().isoformat()
+
+    # Ambil nama kelas
+    cursor.execute("SELECT nama FROM kelas WHERE id = %s LIMIT 1", [kelas_id])
+    kelas_row = cursor.fetchone()
+    kelas_nama = kelas_row["nama"] if kelas_row else None
+
+    # ── 1) Daftar siswa aktif di kelas ──
+    cursor.execute("""
+        SELECT s.id AS siswa_id, s.nama, s.nis
+        FROM penempatan_kelas pk
+        JOIN siswa s ON pk.siswa_id = s.id
+        WHERE pk.kelas_id = %s AND pk.status = 'aktif'
+              AND s.deleted_at IS NULL
+        ORDER BY s.nama
+    """, [kelas_id])
+    siswa_aktif = cursor.fetchall()
+    siswa_id_set = {s["siswa_id"] for s in siswa_aktif}
+
+    # ── 2) Record absensi yang sudah ada ──
+    cursor.execute("""
+        SELECT
+            a.siswa_id,
+            s.nis,
+            s.nama,
+            a.status,
+            a.metode,
+            a.waktu_absen
+        FROM absensi a
+        JOIN siswa s ON a.siswa_id = s.id
+        WHERE a.kelas_id = %s AND a.tanggal = %s
+        ORDER BY s.nama
+    """, [kelas_id, tanggal])
+    records = cursor.fetchall()
+
+    # Build students list & track recorded IDs
+    students = []
+    recorded_ids = set()
+    counts = {"Hadir": 0, "Izin": 0, "Sakit": 0, "Alfa": 0}
+
+    for r in records:
+        recorded_ids.add(r["siswa_id"])
+        status = r["status"]
+        if status in counts:
+            counts[status] += 1
+
+        waktu = r["waktu_absen"]
+        if waktu is not None:
+            waktu = str(waktu)  # timedelta → string
+
+        students.append({
+            "siswa_id": r["siswa_id"],
+            "nis": r["nis"],
+            "nama": r["nama"],
+            "status": status,
+            "metode": r["metode"],
+            "waktu_absen": waktu,
+            "catatan": None       # tabel absensi belum punya kolom catatan
+        })
+
+    # ── 3) Siswa aktif tanpa record (missing) ──
+    missing_records = []
+    for s in siswa_aktif:
+        if s["siswa_id"] not in recorded_ids:
+            missing_records.append({
+                "siswa_id": s["siswa_id"],
+                "nis": s["nis"],
+                "nama": s["nama"],
+                "note": "Belum ada record absensi di tanggal ini"
+            })
+
+    total_siswa = len(siswa_aktif)
+    persen_hadir = round(counts["Hadir"] * 100.0 / total_siswa, 2) if total_siswa else 0
+
+    cursor.close()
+    db.close()
+
+    return {
+        "report_type": "guru_absensi_harian_detail",
+        "scope": {
+            "tanggal": tanggal,
+            "kelas_id": kelas_id,
+            "kelas": kelas_nama
+        },
+        "summary": {
+            "total_siswa": total_siswa,
+            "counts": counts,
+            "persen_hadir": persen_hadir
+        },
+        "students": students,
+        "missing_records": missing_records,
+        "generated_at": datetime.now().isoformat()
     }

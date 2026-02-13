@@ -438,5 +438,38 @@ tools = [
                 "required": ["tanggal_mulai", "tanggal_akhir"]
             }
         }
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "get_laporan_kepsek_range",
+            "description": "Laporan ringkasan range untuk kepala sekolah: ringkasan lintas kelas, ranking kehadiran per kelas, dan alerts otomatis (kehadiran rendah, alfa tinggi). Cocok untuk laporan mingguan/2 mingguan/bulanan kepsek.",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "tanggal_mulai": {"type": "string", "description": "Tanggal mulai periode (YYYY-MM-DD)"},
+                    "tanggal_akhir": {"type": "string", "description": "Tanggal akhir periode (YYYY-MM-DD)"},
+                    "tingkat": {"type": "integer", "description": "Filter tingkat/kelas (10, 11, 12). Opsional."},
+                    "jurusan": {"type": "string", "description": "Filter jurusan (RPL, TKJ, dll). Opsional."},
+                    "threshold_kehadiran": {"type": "number", "description": "Batas persen kehadiran untuk alert LOW_ATTENDANCE_CLASS. Default: 85.0"}
+                },
+                "required": ["tanggal_mulai", "tanggal_akhir"]
+            }
+        }
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "get_laporan_guru_harian",
+            "description": "Laporan absensi harian detail untuk guru/wali kelas: daftar setiap siswa beserta status, metode, waktu absen, dan deteksi siswa yang belum punya record absensi.",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "kelas_id": {"type": "integer", "description": "ID kelas (opsional jika nama_kelas diisi)"},
+                    "nama_kelas": {"type": "string", "description": "Nama kelas, misal 'X RPL 1' (opsional jika kelas_id diisi)"},
+                    "tanggal": {"type": "string", "description": "Tanggal absensi (YYYY-MM-DD). Default: hari ini"}
+                }
+            }
+        }
     }
 ]

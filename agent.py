@@ -32,6 +32,8 @@ from db_functions import (
     get_analisis_metode_absen,
     get_anomali_absensi,
     get_statistik_waktu_absen,
+    get_laporan_kepsek_range,
+    get_laporan_guru_harian,
 )
 
 
@@ -59,6 +61,8 @@ available_functions = {
     "get_analisis_metode_absen": get_analisis_metode_absen,
     "get_anomali_absensi": get_anomali_absensi,
     "get_statistik_waktu_absen": get_statistik_waktu_absen,
+    "get_laporan_kepsek_range": get_laporan_kepsek_range,
+    "get_laporan_guru_harian": get_laporan_guru_harian,
 }
 
 

@@ -1,4 +1,4 @@
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useState, useRef, useEffect, useCallback } from 'react';
 import { useChat } from '@ai-sdk/react';
 import { TextStreamChatTransport } from 'ai';
 import {
@@ -11,19 +11,84 @@ import '../custom-styles.css';
 import PdfDownloadDetector from '../components/PdfDownloadDetector';
 import DateSuggestion from '../components/DateSuggestion';
 import ChatLoadingIndicator from '../components/ChatLoadingIndicator';
+import ParamPickerModal from '../components/ParamPickerModal';
 
+/**
+ * Suggested questions.
+ * - Tanpa `params`: langsung kirim `text`.
+ * - Dengan `params`: buka modal dulu, user pilih, lalu compose `template(values)`.
+ */
 const SUGGESTED_QUESTIONS = [
-  { label: "Absen Hari Ini", text: "Siapa saja yang tidak hadir hari ini?" },
-  { label: "Rekap Kelas", text: "Tampilkan rekap absensi kelas X RPL 1 bulan ini" },
-  { label: "Siswa Alfa", text: "Siapa saja yang alfa hari ini?" },
-  { label: "Persentase Kehadiran", text: "Berapa persentase kehadiran bulan ini?" },
-  { label: "Top Siswa Bolos", text: "Siapa 5 siswa paling sering alfa?" },
-  { label: "Analisis Anomali", text: "Cek anomali absensi hari ini" },
+  {
+    label: "Absen Hari Ini",
+    icon: "today",
+    text: "Siapa saja yang tidak hadir hari ini?",
+  },
+  {
+    label: "Rekap Kelas",
+    icon: "class",
+    params: {
+      title: "Rekap Absensi Kelas",
+      fields: [
+        { key: "kelas", label: "Pilih Kelas", type: "kelas", required: true },
+        { key: "periode", label: "Periode", type: "date_range", required: true },
+      ],
+    },
+    template: (v) =>
+      `Tampilkan rekap absensi kelas ${v.kelas} dari tanggal ${v.periode_mulai} sampai ${v.periode_akhir}`,
+  },
+  {
+    label: "Siswa Alfa",
+    icon: "person_off",
+    text: "Siapa saja yang alfa hari ini?",
+  },
+  {
+    label: "Persentase Kehadiran",
+    icon: "percent",
+    text: "Berapa persentase kehadiran bulan ini?",
+  },
+  {
+    label: "Top Siswa Bolos",
+    icon: "trending_up",
+    text: "Siapa 5 siswa paling sering alfa?",
+  },
+  {
+    label: "Analisis Anomali",
+    icon: "warning",
+    text: "Cek anomali absensi hari ini",
+  },
+  {
+    label: "Laporan Kepsek",
+    icon: "summarize",
+    params: {
+      title: "Laporan Ringkasan Kepala Sekolah",
+      fields: [
+        { key: "periode", label: "Periode Laporan", type: "date_range", required: true },
+      ],
+    },
+    template: (v) =>
+      `Buatkan laporan ringkasan kehadiran seluruh kelas dari tanggal ${v.periode_mulai} sampai ${v.periode_akhir}`,
+  },
+  {
+    label: "Laporan Guru Harian",
+    icon: "assignment_ind",
+    params: {
+      title: "Laporan Guru Harian Detail",
+      fields: [
+        { key: "kelas", label: "Pilih Kelas", type: "kelas", required: true },
+        { key: "tanggal", label: "Tanggal", type: "date", required: true, defaultToday: true },
+      ],
+    },
+    template: (v) =>
+      `Tampilkan laporan absensi harian detail kelas ${v.kelas} tanggal ${v.tanggal}`,
+  },
 ];
 
 const ChatPage = () => {
   const [chatKey, setChatKey] = useState(0);
   const messagesEndRef = useRef(null);
+  const [pickerOpen, setPickerOpen] = useState(false);
+  const [activeQuestion, setActiveQuestion] = useState(null);
 
   const handler = useChat({
     chatId: `chat-${chatKey}`,
@@ -43,9 +108,30 @@ const ChatPage = () => {
     setChatKey(prev => prev + 1);
   };
 
-  const handleSuggestionClick = (text) => {
-    handler.sendMessage({ text });
-  };
+  const handleSuggestionClick = useCallback((question) => {
+    if (question.params) {
+      // Butuh parameter → buka modal picker
+      setActiveQuestion(question);
+      setPickerOpen(true);
+    } else {
+      // Langsung kirim
+      handler.sendMessage({ text: question.text });
+    }
+  }, [handler]);
+
+  const handlePickerSubmit = useCallback((values) => {
+    if (activeQuestion?.template) {
+      const text = activeQuestion.template(values);
+      handler.sendMessage({ text });
+    }
+    setPickerOpen(false);
+    setActiveQuestion(null);
+  }, [activeQuestion, handler]);
+
+  const handlePickerClose = useCallback(() => {
+    setPickerOpen(false);
+    setActiveQuestion(null);
+  }, []);
 
   const handleDateSelect = (_label, dateText) => {
     handler.sendMessage({ text: dateText });
@@ -82,11 +168,16 @@ const ChatPage = () => {
           {SUGGESTED_QUESTIONS.map((q, idx) => (
             <button
               key={idx}
-              onClick={() => handleSuggestionClick(q.text)}
+              onClick={() => handleSuggestionClick(q)}
               className="w-full text-left flex items-center gap-2 px-3 py-2.5 text-sm text-foreground hover:bg-accent rounded-lg transition-colors"
             >
-              <span className="material-icons-round text-base text-muted-foreground">chat_bubble_outline</span>
+              <span className="material-icons-round text-base text-muted-foreground">
+                {q.icon || 'chat_bubble_outline'}
+              </span>
               <span className="truncate">{q.label}</span>
+              {q.params && (
+                <span className="material-icons-round text-xs text-primary ml-auto">tune</span>
+              )}
             </button>
           ))}
         </div>
@@ -144,9 +235,10 @@ const ChatPage = () => {
                     {SUGGESTED_QUESTIONS.slice(0, 4).map((q, idx) => (
                       <button
                         key={idx}
-                        onClick={() => handleSuggestionClick(q.text)}
-                        className="text-xs bg-primary/10 text-primary hover:bg-primary/20 px-3 py-2 rounded-full transition-colors font-medium border border-primary/20"
+                        onClick={() => handleSuggestionClick(q)}
+                        className="text-xs bg-primary/10 text-primary hover:bg-primary/20 px-3 py-2 rounded-full transition-colors font-medium border border-primary/20 flex items-center gap-1"
                       >
+                        <span className="material-icons-round text-sm">{q.icon || 'chat_bubble_outline'}</span>
                         {q.label}
                       </button>
                     ))}
@@ -178,6 +270,14 @@ const ChatPage = () => {
           </ChatSection>
         </div>
       </main>
+
+      {/* Parameter Picker Modal */}
+      <ParamPickerModal
+        open={pickerOpen}
+        config={activeQuestion?.params}
+        onSubmit={handlePickerSubmit}
+        onClose={handlePickerClose}
+      />
     </div>
   );
 };
