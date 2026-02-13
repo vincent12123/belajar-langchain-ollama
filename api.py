@@ -72,16 +72,27 @@ class TopSiswaRequest(BaseModel):
     status: Optional[str] = "Alfa"
     limit: Optional[int] = 10
 
+class StatistikWaktuRequest(BaseModel):
+    kelas_id: Optional[int] = None
+    nama_kelas: Optional[str] = None
+    tanggal_mulai: Optional[str] = None
+    tanggal_akhir: Optional[str] = None
+    jam_telat: Optional[str] = "07:15:00"
+    limit: Optional[int] = 10
+
 # Import your existing functions
 try:
     from agent import run_agent, run_agent_with_history
     from db_functions import (
+        cari_siswa,
+        get_absensi_by_siswa,
         get_attendance_trends,
         get_geolocation_analysis,
         compare_class_attendance,
         get_anomali_absensi,
         get_analisis_metode_absen,
-        get_top_siswa_absensi
+        get_top_siswa_absensi,
+        get_statistik_waktu_absen,
     )
     BACKEND_READY = True
 except ImportError as e:
@@ -306,6 +317,66 @@ async def get_top_siswa_api(request: TopSiswaRequest):
         return result
     except Exception as e:
         logger.error(f"Top siswa error: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+# ── Missing endpoints for frontend api.js ──
+
+@app.get("/api/students/search")
+async def search_students_api(name: str):
+    """Search students by name"""
+    if not BACKEND_READY:
+        raise HTTPException(status_code=503, detail="Backend services not available")
+
+    try:
+        loop = asyncio.get_event_loop()
+        result = await loop.run_in_executor(None, cari_siswa, name)
+        return result
+    except Exception as e:
+        logger.error(f"Student search error: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.get("/api/students/{student_id}/attendance")
+async def get_student_attendance_api(student_id: int, start_date: str = None, end_date: str = None):
+    """Get attendance data for specific student"""
+    if not BACKEND_READY:
+        raise HTTPException(status_code=503, detail="Backend services not available")
+
+    try:
+        loop = asyncio.get_event_loop()
+        result = await loop.run_in_executor(
+            None,
+            get_absensi_by_siswa,
+            student_id,
+            None,
+            start_date,
+            end_date
+        )
+        return result
+    except Exception as e:
+        logger.error(f"Student attendance error: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.post("/api/statistik/waktu")
+async def get_statistik_waktu_api(request: StatistikWaktuRequest):
+    """Get attendance time statistics"""
+    if not BACKEND_READY:
+        raise HTTPException(status_code=503, detail="Backend services not available")
+
+    try:
+        loop = asyncio.get_event_loop()
+        result = await loop.run_in_executor(
+            None,
+            get_statistik_waktu_absen,
+            request.kelas_id,
+            request.nama_kelas,
+            request.tanggal_mulai,
+            request.tanggal_akhir,
+            request.jam_telat,
+            request.limit
+        )
+        return result
+    except Exception as e:
+        logger.error(f"Statistik waktu error: {e}")
         raise HTTPException(status_code=500, detail=str(e))
 
 @app.websocket("/ws/{client_id}")

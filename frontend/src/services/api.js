@@ -68,6 +68,46 @@ export const getClassComparison = async (params) => {
   }
 };
 
+// Anomali Absensi API
+export const getAnomaliAbsensi = async (params) => {
+  try {
+    const response = await api.post('/api/anomali/absensi', params);
+    return response.data;
+  } catch (error) {
+    throw new Error(error.response?.data?.detail || 'Failed to get anomali absensi');
+  }
+};
+
+// Analisis Metode Absen API
+export const getAnalisisMetode = async (params) => {
+  try {
+    const response = await api.post('/api/analisis/metode', params);
+    return response.data;
+  } catch (error) {
+    throw new Error(error.response?.data?.detail || 'Failed to get analisis metode');
+  }
+};
+
+// Top Siswa Absensi API
+export const getTopSiswa = async (params) => {
+  try {
+    const response = await api.post('/api/top/siswa', params);
+    return response.data;
+  } catch (error) {
+    throw new Error(error.response?.data?.detail || 'Failed to get top siswa');
+  }
+};
+
+// Statistik Waktu Absen API
+export const getStatistikWaktu = async (params) => {
+  try {
+    const response = await api.post('/api/statistik/waktu', params);
+    return response.data;
+  } catch (error) {
+    throw new Error(error.response?.data?.detail || 'Failed to get statistik waktu');
+  }
+};
+
 // Student Search API
 export const searchStudents = async (name) => {
   try {

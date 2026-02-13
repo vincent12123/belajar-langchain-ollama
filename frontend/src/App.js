@@ -6,6 +6,10 @@ import ChatPage from './pages/ChatPage';
 import AttendanceTrendsPage from './pages/AttendanceTrendsPage';
 import GeolocationAnalysisPage from './pages/GeolocationAnalysisPage';
 import ClassComparisonPage from './pages/ClassComparisonPage';
+import AnomaliAbsensiPage from './pages/AnomaliAbsensiPage';
+import AnalisisMetodePage from './pages/AnalisisMetodePage';
+import TopSiswaPage from './pages/TopSiswaPage';
+import StatistikWaktuPage from './pages/StatistikWaktuPage';
 import ConnectionStatus from './components/ConnectionStatus';
 
 const NAV_ITEMS = [
@@ -14,6 +18,10 @@ const NAV_ITEMS = [
   { path: '/trends', label: 'Tren', icon: 'trending_up' },
   { path: '/geolocation', label: 'Lokasi', icon: 'location_on' },
   { path: '/comparison', label: 'Kelas', icon: 'compare_arrows' },
+  { path: '/anomali', label: 'Anomali', icon: 'warning' },
+  { path: '/metode', label: 'Metode', icon: 'fingerprint' },
+  { path: '/top-siswa', label: 'Top Siswa', icon: 'leaderboard' },
+  { path: '/statistik-waktu', label: 'Waktu', icon: 'schedule' },
 ];
 
 function NavBar() {
@@ -80,6 +88,26 @@ function App() {
           <Route path="/comparison" element={
             <div className="max-w-6xl mx-auto p-6">
               <ClassComparisonPage />
+            </div>
+          } />
+          <Route path="/anomali" element={
+            <div className="max-w-6xl mx-auto p-6">
+              <AnomaliAbsensiPage />
+            </div>
+          } />
+          <Route path="/metode" element={
+            <div className="max-w-6xl mx-auto p-6">
+              <AnalisisMetodePage />
+            </div>
+          } />
+          <Route path="/top-siswa" element={
+            <div className="max-w-6xl mx-auto p-6">
+              <TopSiswaPage />
+            </div>
+          } />
+          <Route path="/statistik-waktu" element={
+            <div className="max-w-6xl mx-auto p-6">
+              <StatistikWaktuPage />
             </div>
           } />
         </Routes>

@@ -1,10 +1,16 @@
 # agent.py
 # Agent Router menggunakan Ollama
 
-import ollama
+from ollama import Client
 import json
-from config import OLLAMA_MODEL, SYSTEM_PROMPT
+from config import OLLAMA_MODEL, OLLAMA_BASE_URL, OLLAMA_API_KEY, SYSTEM_PROMPT
 from tools_definition import tools
+
+# Buat Ollama client dengan base URL dan API key dari config
+ollama_client = Client(
+    host=OLLAMA_BASE_URL,
+    headers={"Authorization": f"Bearer {OLLAMA_API_KEY}"} if OLLAMA_API_KEY else {}
+)
 from db_functions import (
     cari_siswa,
     get_siswa_by_kelas,
@@ -108,7 +114,7 @@ def run_agent_with_history(user_message: str, chat_history: list = None, model: 
 
     # ── Step 1: Kirim ke Ollama dengan tools ──
     try:
-        response = ollama.chat(
+        response = ollama_client.chat(
             model=model,
             messages=messages,
             tools=tools
@@ -163,7 +169,7 @@ def run_agent_with_history(user_message: str, chat_history: list = None, model: 
 
         # ── Step 5: Dapatkan jawaban final dari LLM ──
         try:
-            final_response = ollama.chat(
+            final_response = ollama_client.chat(
                 model=model,
                 messages=messages
             )
