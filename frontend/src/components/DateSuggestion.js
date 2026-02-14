@@ -99,7 +99,8 @@ const DateSuggestion = ({ messages, onSelectDate }) => {
     return { shouldShow: true, isRange: hasRange };
   }, [messages]);
 
-  /** Extract the last user question to build contextual follow-up */
+  /** Extract the last user question to build contextual follow-up.
+   *  Strip any previously appended date suffixes to prevent stacking. */
   const lastUserQuestion = useMemo(() => {
     if (!messages || messages.length === 0) return '';
     for (let i = messages.length - 1; i >= 0; i--) {
@@ -113,7 +114,12 @@ const DateSuggestion = ({ messages, onSelectDate }) => {
           .map((p) => p.text)
           .join(' ');
       }
-      if (text) return text.trim();
+      if (text) {
+        // Remove previously appended date strings to avoid stacking
+        // Matches: " pada tanggal ...", " dari tanggal ... sampai ..."
+        text = text.replace(/\s+(pada tanggal|dari tanggal)\s+\d{4}-\d{2}-\d{2}(\s+sampai\s+\d{4}-\d{2}-\d{2})?/g, '');
+        return text.trim();
+      }
     }
     return '';
   }, [messages]);

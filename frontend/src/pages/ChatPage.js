@@ -50,7 +50,14 @@ const SUGGESTED_QUESTIONS = [
   {
     label: "Top Siswa Bolos",
     icon: "trending_up",
-    text: "Siapa 5 siswa paling sering alfa?",
+    params: {
+      title: "Top Siswa Bolos",
+      fields: [
+        { key: "periode", label: "Periode", type: "date_range", required: true },
+      ],
+    },
+    template: (v) =>
+      `Siapa 5 siswa paling sering alfa dari tanggal ${v.periode_mulai} sampai ${v.periode_akhir}`,
   },
   {
     label: "Analisis Anomali",

@@ -169,7 +169,7 @@ tools = [
         "type": "function",
         "function": {
             "name": "get_persentase_kehadiran",
-            "description": "Menghitung persentase kehadiran siswa atau seluruh kelas dalam periode tertentu. Bisa menggunakan ID siswa, nama siswa, ID kelas, atau nama kelas.",
+            "description": "Menghitung persentase kehadiran. Bisa per siswa, per kelas, atau seluruh sekolah (tanpa siswa/kelas). Bisa filter bulan dan tahun.",
             "parameters": {
                 "type": "object",
                 "properties": {
@@ -368,12 +368,12 @@ tools = [
         "type": "function",
         "function": {
             "name": "get_top_siswa_absensi",
-            "description": "Ambil top siswa dengan jumlah status tertentu (default: Alfa) pada rentang tanggal.",
+            "description": "Ambil top siswa dengan jumlah status tertentu (default: Alfa) pada rentang tanggal. Bisa per kelas atau seluruh sekolah (tanpa kelas).",
             "parameters": {
                 "type": "object",
                 "properties": {
-                    "kelas_id": {"type": "integer", "description": "ID kelas (opsional jika nama_kelas diisi)"},
-                    "nama_kelas": {"type": "string", "description": "Nama kelas (opsional jika kelas_id diisi)"},
+                    "kelas_id": {"type": "integer", "description": "ID kelas (opsional, kosongkan untuk seluruh sekolah)"},
+                    "nama_kelas": {"type": "string", "description": "Nama kelas (opsional, kosongkan untuk seluruh sekolah)"},
                     "tanggal_mulai": {"type": "string", "description": "Tanggal mulai (YYYY-MM-DD)"},
                     "tanggal_akhir": {"type": "string", "description": "Tanggal akhir (YYYY-MM-DD)"},
                     "status": {"type": "string", "description": "Status yang dihitung: Hadir/Izin/Sakit/Alfa. Default: Alfa"},

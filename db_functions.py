@@ -389,37 +389,75 @@ def get_persentase_kehadiran(
             SELECT 
                 s.nama AS nama_siswa,
                 ROUND(
-                    COUNT(CASE WHEN a.status = 'hadir' THEN 1 END) * 100.0 / COUNT(*), 2
+                    COUNT(CASE WHEN a.status = 'Hadir' THEN 1 END) * 100.0 / COUNT(*), 2
                 ) AS persentase_kehadiran
             FROM absensi a
             JOIN siswa s ON a.siswa_id = s.id
             WHERE a.siswa_id = %s
         """
         params = [siswa_id]
+
+        if bulan:
+            query += " AND MONTH(a.tanggal) = %s"
+            params.append(bulan)
+        if tahun:
+            query += " AND YEAR(a.tanggal) = %s"
+            params.append(tahun)
+
+        cursor.execute(query, params)
+        result = cursor.fetchone()
+
     elif kelas_id:
         query = """
             SELECT 
                 k.nama AS kelas,
                 ROUND(
-                    COUNT(CASE WHEN a.status = 'hadir' THEN 1 END) * 100.0 / COUNT(*), 2
+                    COUNT(CASE WHEN a.status = 'Hadir' THEN 1 END) * 100.0 / COUNT(*), 2
                 ) AS persentase_kehadiran
             FROM absensi a
             JOIN kelas k ON a.kelas_id = k.id
             WHERE a.kelas_id = %s
         """
         params = [kelas_id]
+
+        if bulan:
+            query += " AND MONTH(a.tanggal) = %s"
+            params.append(bulan)
+        if tahun:
+            query += " AND YEAR(a.tanggal) = %s"
+            params.append(tahun)
+
+        cursor.execute(query, params)
+        result = cursor.fetchone()
+
     else:
-        return {"error": "Harus menyertakan siswa_id atau kelas_id"}
+        # Seluruh sekolah — persentase kehadiran global
+        query = """
+            SELECT 
+                'Seluruh Sekolah' AS scope,
+                COUNT(DISTINCT a.siswa_id) AS total_siswa,
+                COUNT(*) AS total_record,
+                COUNT(CASE WHEN a.status = 'Hadir' THEN 1 END) AS total_hadir,
+                COUNT(CASE WHEN a.status = 'Izin' THEN 1 END) AS total_izin,
+                COUNT(CASE WHEN a.status = 'Sakit' THEN 1 END) AS total_sakit,
+                COUNT(CASE WHEN a.status = 'Alfa' THEN 1 END) AS total_alfa,
+                ROUND(
+                    COUNT(CASE WHEN a.status = 'Hadir' THEN 1 END) * 100.0 / COUNT(*), 2
+                ) AS persentase_kehadiran
+            FROM absensi a
+            WHERE 1=1
+        """
+        params = []
 
-    if bulan:
-        query += " AND MONTH(a.tanggal) = %s"
-        params.append(bulan)
-    if tahun:
-        query += " AND YEAR(a.tanggal) = %s"
-        params.append(tahun)
+        if bulan:
+            query += " AND MONTH(a.tanggal) = %s"
+            params.append(bulan)
+        if tahun:
+            query += " AND YEAR(a.tanggal) = %s"
+            params.append(tahun)
 
-    cursor.execute(query, params)
-    result = cursor.fetchone()
+        cursor.execute(query, params)
+        result = cursor.fetchone()
 
     cursor.close()
     db.close()
@@ -1030,33 +1068,38 @@ def get_top_siswa_absensi(
             db.close()
             return {"error": f"Kelas dengan nama '{nama_kelas}' tidak ditemukan atau ada lebih dari satu hasil. Coba gunakan nama kelas yang lebih spesifik."}
 
-    if not kelas_id:
-        cursor.close()
-        db.close()
-        return {"error": "Harus menyertakan kelas_id atau nama_kelas"}
-
     if not tanggal_mulai or not tanggal_akhir:
         cursor.close()
         db.close()
         return {"error": "Harus menyertakan tanggal_mulai dan tanggal_akhir (format YYYY-MM-DD)"}
 
-    query = """
+    # Build query — jika kelas_id ada, filter per kelas; jika tidak, seluruh sekolah
+    where_clauses = ["a.tanggal BETWEEN %s AND %s", "a.status = %s"]
+    params = [tanggal_mulai, tanggal_akhir, status]
+
+    if kelas_id:
+        where_clauses.append("a.kelas_id = %s")
+        params.append(kelas_id)
+
+    params.append(limit)
+
+    query = f"""
         SELECT
             s.id AS siswa_id,
             s.nama AS nama_siswa,
             s.nis,
+            k.nama AS kelas,
             COUNT(*) AS total
         FROM absensi a
         JOIN siswa s ON a.siswa_id = s.id
-        WHERE a.kelas_id = %s
-          AND a.tanggal BETWEEN %s AND %s
-          AND a.status = %s
-        GROUP BY s.id, s.nama, s.nis
+        LEFT JOIN kelas k ON a.kelas_id = k.id
+        WHERE {' AND '.join(where_clauses)}
+        GROUP BY s.id, s.nama, s.nis, k.nama
         HAVING total > 0
         ORDER BY total DESC, s.nama ASC
         LIMIT %s
     """
-    cursor.execute(query, [kelas_id, tanggal_mulai, tanggal_akhir, status, limit])
+    cursor.execute(query, params)
     rows = cursor.fetchall()
 
     cursor.close()
