@@ -1,11 +1,25 @@
 from fastapi import FastAPI, HTTPException, Request, WebSocket, WebSocketDisconnect
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse, StreamingResponse
-from pydantic import BaseModel
 from typing import Optional
 import asyncio
 import os
 import logging
+
+# Pydantic models dari package models/
+from models.requests import (
+    QueryRequest,
+    AttendanceTrendsRequest,
+    GeolocationAnalysisRequest,
+    ClassComparisonRequest,
+    AnomaliAbsensiRequest,
+    AnalisisMetodeAbsenRequest,
+    TopSiswaRequest,
+    StatistikWaktuRequest,
+    LaporanKepsekRequest,
+    LaporanGuruHarianRequest,
+)
+from models.responses import QueryResponse
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
@@ -26,71 +40,6 @@ app.add_middleware(
     allow_headers=["*"],
     expose_headers=["X-Vercel-AI-Data-Stream"],
 )
-
-# Models
-class QueryRequest(BaseModel):
-    query: str
-    model: Optional[str] = None  # Optional, will use default if None
-
-class QueryResponse(BaseModel):
-    answer: str
-
-# Models for new endpoints
-class AttendanceTrendsRequest(BaseModel):
-    siswa_id: Optional[int] = None
-    nama_siswa: Optional[str] = None
-    kelas_id: Optional[int] = None
-    nama_kelas: Optional[str] = None
-    months: Optional[int] = 6
-
-class GeolocationAnalysisRequest(BaseModel):
-    kelas_id: Optional[int] = None
-    nama_kelas: Optional[str] = None
-    tanggal: Optional[str] = None
-
-class ClassComparisonRequest(BaseModel):
-    tingkat: Optional[int] = None
-    jurusan: Optional[str] = None
-
-class AnomaliAbsensiRequest(BaseModel):
-    kelas_id: Optional[int] = None
-    nama_kelas: Optional[str] = None
-    tanggal_mulai: Optional[str] = None
-    tanggal_akhir: Optional[str] = None
-
-class AnalisisMetodeAbsenRequest(BaseModel):
-    kelas_id: Optional[int] = None
-    nama_kelas: Optional[str] = None
-    tanggal_mulai: Optional[str] = None
-    tanggal_akhir: Optional[str] = None
-
-class TopSiswaRequest(BaseModel):
-    kelas_id: Optional[int] = None
-    nama_kelas: Optional[str] = None
-    tanggal_mulai: Optional[str] = None
-    tanggal_akhir: Optional[str] = None
-    status: Optional[str] = "Alfa"
-    limit: Optional[int] = 10
-
-class StatistikWaktuRequest(BaseModel):
-    kelas_id: Optional[int] = None
-    nama_kelas: Optional[str] = None
-    tanggal_mulai: Optional[str] = None
-    tanggal_akhir: Optional[str] = None
-    jam_telat: Optional[str] = "07:15:00"
-    limit: Optional[int] = 10
-
-class LaporanKepsekRequest(BaseModel):
-    tanggal_mulai: str
-    tanggal_akhir: str
-    tingkat: Optional[int] = None
-    jurusan: Optional[str] = None
-    threshold_kehadiran: Optional[float] = 85.0
-
-class LaporanGuruHarianRequest(BaseModel):
-    kelas_id: Optional[int] = None
-    nama_kelas: Optional[str] = None
-    tanggal: Optional[str] = None
 
 # Import your existing functions
 try:

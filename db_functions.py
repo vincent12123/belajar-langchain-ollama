@@ -4,12 +4,12 @@
 import mysql.connector
 from datetime import date
 from typing import Optional, List, Dict, Any
-from config import DB_CONFIG
+from config import DB_CONFIG_DICT
 
 
 def get_db_connection():
     """Buat koneksi baru ke database"""
-    return mysql.connector.connect(**DB_CONFIG)
+    return mysql.connector.connect(**DB_CONFIG_DICT)
 
 
 def _resolve_siswa_id(cursor, nama_siswa: str) -> Optional[int]:
