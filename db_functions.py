@@ -267,10 +267,10 @@ def get_rekap_absensi(
         SELECT 
             s.nama AS nama_siswa,
             s.nis,
-            COUNT(CASE WHEN a.status = 'hadir' THEN 1 END) AS total_hadir,
-            COUNT(CASE WHEN a.status = 'sakit' THEN 1 END) AS total_sakit,
-            COUNT(CASE WHEN a.status = 'izin' THEN 1 END)  AS total_izin,
-            COUNT(CASE WHEN a.status = 'alfa' THEN 1 END)  AS total_alfa,
+            COUNT(CASE WHEN a.status = 'Hadir' THEN 1 END) AS total_hadir,
+            COUNT(CASE WHEN a.status = 'Sakit' THEN 1 END) AS total_sakit,
+            COUNT(CASE WHEN a.status = 'Izin' THEN 1 END)  AS total_izin,
+            COUNT(CASE WHEN a.status = 'Alfa' THEN 1 END)  AS total_alfa,
             COUNT(*) AS total_hari
         FROM absensi a
         JOIN siswa s ON a.siswa_id = s.id

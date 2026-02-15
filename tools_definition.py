@@ -272,30 +272,6 @@ tools = [
     {
         "type": "function",
         "function": {
-            "name": "get_geolocation_analysis",
-            "description": "Analyze geolocation data for attendance validation and detect anomalies in student locations",
-            "parameters": {
-                "type": "object",
-                "properties": {
-                    "kelas_id": {
-                        "type": "integer",
-                        "description": "ID kelas (opsional jika nama_kelas diisi)"
-                    },
-                    "nama_kelas": {
-                        "type": "string",
-                        "description": "Nama kelas, misal 'X RPL', 'XI TSM' (opsional jika kelas_id diisi)"
-                    },
-                    "tanggal": {
-                        "type": "string",
-                        "description": "Specific date for analysis in YYYY-MM-DD format (opsional)"
-                    }
-                }
-            }
-        }
-    },
-    {
-        "type": "function",
-        "function": {
             "name": "compare_class_attendance",
             "description": "Compare attendance rates between different classes to identify patterns and performance differences",
             "parameters": {
